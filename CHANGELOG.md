@@ -16,7 +16,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
-- None.
+- Stored SSH config, known hosts, and server memory in Pi's agent directory (`~/.pi/agent`, or `PI_CODING_AGENT_DIR`) instead of falling back to the current working directory when `HOME` is unset, which mainly affected Windows.
+- Expanded `ssh -i ~/...` identity paths with the user home directory from `os.homedir()`, so private keys resolve on Windows. `~\...` is also accepted.
 
 ## [0.1.12] - 2026-08-25
 

@@ -10,12 +10,12 @@ import ssh2, { type Client as SshClient, type ClientChannel, type ConnectConfig,
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { createServer, type Server, type Socket } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
-  CONFIG_DIR_NAME,
+  getAgentDir,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   createBashTool,
@@ -106,7 +106,8 @@ interface SessionRemoteState {
   forwards?: string[];
 }
 
-const AGENT_DIR = join(process.env.HOME || ".", CONFIG_DIR_NAME, "agent");
+// Use Pi's agent dir so Windows follows USERPROFILE and PI_CODING_AGENT_DIR is honored.
+const AGENT_DIR = getAgentDir();
 const KNOWN_HOSTS_FILE = join(AGENT_DIR, "ssh-remote-known-hosts.json");
 const REMOTE_CONFIG_FILE = join(AGENT_DIR, "ssh-remote-config.json");
 const SERVER_MEMORY_DIR = join(AGENT_DIR, "ssh-remote-memories");
@@ -147,6 +148,10 @@ function shellWords(input: string): string[] {
   return words;
 }
 
+function isHomeRelativePath(filePath: string): boolean {
+  return filePath === "~" || filePath.startsWith("~/");
+}
+
 function parseSshCommand(command: string): ParsedSsh {
   const args = shellWords(command);
   if (args[0] !== "ssh") throw new Error("Command must start with ssh, for example: ssh root@host -p 22");
@@ -175,7 +180,7 @@ function parseSshCommand(command: string): ParsedSsh {
     else throw new Error("Unexpected extra argument in SSH command");
   }
   if (!target || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid SSH host or port");
-  if (identityFile && identityFile !== "~" && !identityFile.startsWith("~/") && !isAbsolute(identityFile)) {
+  if (identityFile && !isHomeRelativePath(identityFile) && !isAbsolute(identityFile)) {
     throw new Error("SSH identity file must use an absolute path or ~/...");
   }
   const at = target.lastIndexOf("@");
@@ -207,10 +212,9 @@ function deleteCachedPassword(config: ParsedSsh): void {
 
 function resolveIdentityPath(config: ParsedSsh): string {
   if (!config.identityFile) throw new Error("No SSH identity file is configured");
-  if (config.identityFile === "~" || config.identityFile.startsWith("~/")) {
-    const home = process.env.HOME;
-    if (!home) throw new Error("Cannot expand SSH identity path because HOME is not set");
-    return config.identityFile === "~" ? home : join(home, config.identityFile.slice(2));
+  // Expand ~ with the user home directory, not Pi's agent directory.
+  if (isHomeRelativePath(config.identityFile)) {
+    return config.identityFile === "~" ? homedir() : join(homedir(), config.identityFile.slice(2));
   }
   return config.identityFile;
 }

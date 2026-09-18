@@ -16,8 +16,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
+- None.
+
+## [0.1.13] - 2026-09-18
+
+### Added
+
+- None.
+
+### Changed
+
+- Increased the SSH handshake timeout to 30 seconds for slower remote connections.
+
+### Fixed
+
 - Stored SSH config, known hosts, and server memory in Pi's agent directory (`~/.pi/agent`, or `PI_CODING_AGENT_DIR`) instead of falling back to the current working directory when `HOME` is unset, which mainly affected Windows.
 - Expanded `ssh -i ~/...` identity paths with the user home directory from `os.homedir()`, so private keys resolve on Windows.
+- Fell back to the remote login directory with a warning when a saved remote working directory is unavailable, instead of failing the SSH connection.
 
 ## [0.1.12] - 2026-08-25
 
@@ -221,7 +236,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 - None.
 
-[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.9...v0.1.10

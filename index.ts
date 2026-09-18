@@ -47,6 +47,7 @@ interface ParsedSsh {
 interface RemoteState extends ParsedSsh {
   client: SshClient;
   cwd: string;
+  unavailableCwd?: string;
 }
 
 interface CredentialCache {
@@ -121,6 +122,7 @@ const DEFAULT_EXEC_MAX_BYTES = 8 * 1024;
 const DEFAULT_TURN_MAX_BYTES = 32 * 1024;
 const MIN_MODEL_OUTPUT_BYTES = 1024;
 const OUTPUT_FOOTER_RESERVE_BYTES = 512;
+const SSH_HANDSHAKE_TIMEOUT_MS = 30_000;
 const DEFAULT_REMOTE_TIMEOUT_SECONDS = 30;
 const MAX_REMOTE_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 const MAX_PRIVATE_KEY_BYTES = 1024 * 1024;
@@ -694,7 +696,7 @@ function probeFingerprint(config: ParsedSsh): Promise<string> {
     let settled = false;
     const timer = setTimeout(() => {
       if (!settled) { settled = true; client.end(); reject(new Error("Connection timed out")); }
-    }, 10000);
+    }, SSH_HANDSHAKE_TIMEOUT_MS + 2000);
     client.on("error", (error) => {
       if (!settled) { settled = true; clearTimeout(timer); reject(error); }
     });
@@ -702,7 +704,7 @@ function probeFingerprint(config: ParsedSsh): Promise<string> {
       host: config.host,
       port: config.port,
       username: config.username,
-      readyTimeout: 8000,
+      readyTimeout: SSH_HANDSHAKE_TIMEOUT_MS,
       hostHash: "sha256",
       hostVerifier: (hash) => {
         if (!settled) { settled = true; clearTimeout(timer); resolve(hash); }
@@ -723,7 +725,7 @@ function connect(config: ParsedSsh, authentication: SshAuthentication, fingerpri
       port: config.port,
       username: config.username,
       ...authentication,
-      readyTimeout: 12000,
+      readyTimeout: SSH_HANDSHAKE_TIMEOUT_MS,
       keepaliveInterval: 15000,
       keepaliveCountMax: 3,
       hostHash: "sha256",
@@ -1042,8 +1044,16 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     const client = await connect(parsed, authentication, fingerprint);
     try {
       const cdCommand = cwd === FALLBACK_REMOTE_CWD ? "cd -- ~" : `cd -- ${quote(cwd)}`;
-      const resolved = (await execRemote(client, `${cdCommand} && pwd -P`)).toString().trim();
-      const state = { ...parsed, client, cwd: resolved };
+      let resolved: string;
+      let unavailableCwd: string | undefined;
+      try {
+        resolved = (await execRemote(client, `${cdCommand} && pwd -P`)).toString().trim();
+      } catch (error) {
+        if (cwd === FALLBACK_REMOTE_CWD) throw error;
+        unavailableCwd = cwd;
+        resolved = (await execRemote(client, "cd -- ~ && pwd -P")).toString().trim();
+      }
+      const state = { ...parsed, client, cwd: resolved, ...(unavailableCwd ? { unavailableCwd } : {}) };
       attachClient(state);
       return state;
     } catch (error) {
@@ -1071,7 +1081,11 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       oldClient?.end();
       if (currentCtx) {
         status(currentCtx);
-        currentCtx.ui.notify(`SSH remote reconnected automatically: ${endpointDisplayLabel(next)}:${next.cwd}`, "info");
+        if (next.unavailableCwd) {
+          currentCtx.ui.notify(`SSH remote directory unavailable: ${next.unavailableCwd}; reconnected in default directory ${next.cwd}`, "warning");
+        } else {
+          currentCtx.ui.notify(`SSH remote reconnected automatically: ${endpointDisplayLabel(next)}:${next.cwd}`, "info");
+        }
       }
       return next;
     })().finally(() => { reconnectPromise = null; });
@@ -1172,7 +1186,11 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       saveEndpointConfig(command, { remoteCwd: next.cwd }, true);
       status(ctx);
       persistSessionRemoteState();
-      ctx.ui.notify(`SSH remote connected: ${endpointDisplayLabel(next)}:${next.cwd}`, "info");
+      if (next.unavailableCwd) {
+        ctx.ui.notify(`SSH remote directory unavailable: ${next.unavailableCwd}; connected in default directory ${next.cwd}`, "warning");
+      } else {
+        ctx.ui.notify(`SSH remote connected: ${endpointDisplayLabel(next)}:${next.cwd}`, "info");
+      }
       return next;
     } catch (error) {
       if (!parsed.identityFile) deleteCachedPassword(parsed);

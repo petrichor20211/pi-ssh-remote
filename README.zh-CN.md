@@ -312,13 +312,13 @@ pi install npm:pi-ssh-remote
 
 ## 版本发布
 
-最新版本：[v0.1.12](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.12)
+最新版本：[v0.1.13](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.13)
 
 | 版本 | 日期 | 主要内容 |
 |---|---|---|
+| [0.1.13](CHANGELOG.md#0113---2026-09-18) | 2026-09-18 | 工作目录不可用时平滑回退、延长 SSH 握手等待并修复 Windows 路径 |
 | [0.1.12](CHANGELOG.md#0112---2026-08-25) | 2026-08-25 | 安全处理 SSH 握手期间断线所触发的连续错误 |
 | [0.1.11](CHANGELOG.md#0111---2026-08-16) | 2026-08-16 | JSON 记忆条目、Prompt 引导增删查改与 `/remote memory` 展示命令 |
-| [0.1.10](CHANGELOG.md#0110---2026-08-16) | 2026-08-16 | 默认安全读取且仅追加的服务器记忆 agent 更新逻辑 |
 
 完整的新增内容、行为变更和 Bug 修复记录请查看 [CHANGELOG.md](CHANGELOG.md)。
 

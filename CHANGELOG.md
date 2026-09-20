@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
-- None.
+- Added Pi argument completion for `/remote` subcommands, saved endpoints, config keys, and exec flags.
 
 ## [0.1.13] - 2026-09-18
 

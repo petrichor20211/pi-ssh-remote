@@ -31,7 +31,7 @@ import {
   type ReadOperations,
   type WriteOperations,
 } from "@earendil-works/pi-coding-agent";
-import { CURSOR_MARKER, Key, Text, matchesKey, truncateToWidth, type Component, type Focusable } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, Key, Text, matchesKey, truncateToWidth, type AutocompleteItem, type Component, type Focusable } from "@earendil-works/pi-tui";
 
 const { Client, utils: ssh2Utils } = ssh2;
 
@@ -405,6 +405,93 @@ function normalizeRemoteConfig(config: RemoteConfig): RemoteConfig {
 function loadRemoteConfig(): RemoteConfig {
   try { return normalizeRemoteConfig(JSON.parse(readFileSync(REMOTE_CONFIG_FILE, "utf8"))); }
   catch { return {}; }
+}
+
+const REMOTE_TOP_LEVEL_COMPLETIONS: AutocompleteItem[] = [
+  { value: "ssh", label: "ssh", description: "Connect to USER@HOST" },
+  { value: "config", label: "config", description: "Show or change remote configuration" },
+  { value: "use", label: "use", description: "Select a saved endpoint" },
+  { value: "memory", label: "memory", description: "Show memory for the selected server" },
+  { value: "forward", label: "forward", description: "Start SSH port forwarding" },
+  { value: "unforward", label: "unforward", description: "Stop extension-managed port forwards" },
+  { value: "exec", label: "exec", description: "Run a command in the remote cwd" },
+  { value: "cd", label: "cd", description: "Change the remote working directory" },
+  { value: "status", label: "status", description: "Show the active SSH workspace" },
+  { value: "reload", label: "reload", description: "Reconnect the active SSH workspace" },
+  { value: "disconnect", label: "disconnect", description: "Disconnect and return tools to local execution" },
+  { value: "forget", label: "forget", description: "Disconnect and clear cached credentials" },
+];
+
+const REMOTE_CONFIG_COMPLETIONS: AutocompleteItem[] = [
+  { value: "note", label: "note", description: "Set or clear the endpoint note" },
+  { value: "cwd", label: "cwd", description: "Set the default remote working directory" },
+  { value: "forward", label: "forward", description: "Persist port-forward mappings" },
+  { value: "display-lines", label: "display-lines", description: "Set collapsed command preview lines" },
+  { value: "read-max-lines", label: "read-max-lines", description: "Set remote read line budget" },
+  { value: "read-max-bytes", label: "read-max-bytes", description: "Set remote read byte budget" },
+  { value: "exec-max-lines", label: "exec-max-lines", description: "Set command output line budget" },
+  { value: "exec-max-bytes", label: "exec-max-bytes", description: "Set command output byte budget" },
+  { value: "turn-max-bytes", label: "turn-max-bytes", description: "Set aggregate per-turn output budget" },
+];
+
+const REMOTE_EXEC_COMPLETIONS: AutocompleteItem[] = [
+  { value: "--timeout", label: "--timeout", description: "Override command timeout in seconds" },
+  { value: "--lines", label: "--lines", description: "Override collapsed preview line count" },
+];
+
+function filterAutocompleteItems(items: AutocompleteItem[], prefix: string): AutocompleteItem[] | null {
+  const needle = prefix.toLowerCase();
+  const matches = items.filter((item) => item.value.toLowerCase().startsWith(needle));
+  return matches.length ? matches : null;
+}
+
+function withCompletionPrefix(items: AutocompleteItem[], commandPrefix: string): AutocompleteItem[] {
+  return items.map((item) => ({ ...item, value: `${commandPrefix}${item.label ?? item.value}` }));
+}
+
+function getRemoteArgumentCompletions(prefix: string): AutocompleteItem[] | null {
+  const input = prefix.replace(/^\/?remote(?:\s+|$)/i, "");
+  if (!input.includes(" ")) return filterAutocompleteItems(REMOTE_TOP_LEVEL_COMPLETIONS, input);
+
+  const useMatch = input.match(/^use\s+(.*)$/i);
+  if (useMatch) {
+    const config = loadRemoteConfig();
+    const endpoints: AutocompleteItem[] = Object.keys(config.endpoints ?? {}).map((key) => ({
+      value: key,
+      label: key,
+      description: key === config.activeEndpoint ? "Active endpoint" : "Saved endpoint",
+    }));
+    const matches = filterAutocompleteItems(endpoints, useMatch[1] ?? "");
+    return matches ? withCompletionPrefix(matches, "use ") : null;
+  }
+
+  const configMatch = input.match(/^config\s+(.*)$/i);
+  if (configMatch) {
+    const remainder = configMatch[1] ?? "";
+    if (!remainder.includes(" ")) {
+      const matches = filterAutocompleteItems(REMOTE_CONFIG_COMPLETIONS, remainder);
+      return matches ? withCompletionPrefix(matches, "config ") : null;
+    }
+    const noteMatch = remainder.match(/^note\s+(.*)$/i);
+    if (noteMatch) {
+      const matches = filterAutocompleteItems([{ value: "--clear", label: "--clear", description: "Clear the endpoint note" }], noteMatch[1] ?? "");
+      return matches ? withCompletionPrefix(matches, "config note ") : null;
+    }
+    return null;
+  }
+
+  const execMatch = input.match(/^exec\s+(.*)$/i);
+  if (execMatch) {
+    const remainder = execMatch[1] ?? "";
+    if (!remainder || remainder.startsWith("--")) {
+      const currentToken = remainder.split(/\s+/).at(-1) ?? "";
+      const matches = filterAutocompleteItems(REMOTE_EXEC_COMPLETIONS, currentToken);
+      return matches ? withCompletionPrefix(matches, "exec ") : null;
+    }
+    return null;
+  }
+
+  return null;
 }
 
 function saveRemoteConfig(config: RemoteConfig): void {
@@ -1535,7 +1622,8 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("remote", {
-    description: "Connect over SSH and manage endpoints: /remote | ssh USER@HOST [-p PORT] [-i KEY] | memory | config | use USER@HOST:PORT | config note TEXT|--clear | config cwd PATH | config display-lines N | config read-max-lines|read-max-bytes|exec-max-lines|exec-max-bytes|turn-max-bytes N | forward [MAPPINGS] | unforward | exec [--timeout SECONDS] [--lines N] COMMAND | cd PATH | status | reload | off | forget",
+    description: "Connect over SSH and manage endpoints: /remote | ssh USER@HOST [-p PORT] [-i KEY] | memory | config | use USER@HOST:PORT | config note TEXT|--clear | config cwd PATH | config display-lines N | config read-max-lines|read-max-bytes|exec-max-lines|exec-max-bytes|turn-max-bytes N | forward [MAPPINGS] | unforward | exec [--timeout SECONDS] [--lines N] COMMAND | cd PATH | status | reload | disconnect | forget",
+    getArgumentCompletions: (prefix: string): AutocompleteItem[] | null => getRemoteArgumentCompletions(prefix),
     handler: async (args, ctx) => {
       const input = args.trim().replace(/^\/?remote(?:\s+|$)/i, "").trim();
       const action = input.toLowerCase();
@@ -1718,7 +1806,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
         } catch (error) { ctx.ui.notify(`SSH remote command failed: ${(error as Error).message}`, "error"); }
         return;
       }
-      if (["off", "disconnect", "exit"].includes(action)) { disconnect(ctx); return; }
+      if (["disconnect", "off", "exit"].includes(action)) { disconnect(ctx); return; }
       if (action === "forget") { disconnect(ctx, true); return; }
       if (action === "status") {
         ctx.ui.notify(remote ? `${endpointDisplayLabel(remote)}:${remote.cwd}` : "SSH remote is disconnected", "info");
@@ -1738,9 +1826,18 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
         } catch (error) { ctx.ui.notify(`Failed to change SSH remote path: ${(error as Error).message}`, "error"); }
         return;
       }
-      const command = input || await ctx.ui.input("SSH command:", lastCommand);
-      if (!command) return;
-      await connectInteractive(command, ctx);
+      if (!input) {
+        const selected = lastCommand || activeSshCommand();
+        if (selected) {
+          await connectInteractive(selected, ctx);
+          return;
+        }
+        const prompted = await ctx.ui.input("SSH command:", lastCommand);
+        if (!prompted) return;
+        await connectInteractive(prompted, ctx);
+        return;
+      }
+      await connectInteractive(input, ctx);
     },
   });
 

@@ -216,6 +216,10 @@ tools on the local repository.
 | `/remote off` | Disconnect and return tools to local execution |
 | `/remote forget` | Disconnect and clear cached passwords and key passphrases |
 
+### Slash-command completion
+
+`/remote` supports Pi argument completion. Try typing a partial subcommand like `/remote sta` to complete `status`, or `/remote use ` to choose from saved endpoints.
+
 ## Persistence, output, and security
 
 Endpoint configuration is stored locally in:

@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
-- None.
+- Rendered each `remote` tool action and its command or primary argument in the tool-call header instead of showing only the tool name.
 
 ## [0.1.13] - 2026-09-18
 

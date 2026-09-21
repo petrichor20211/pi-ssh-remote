@@ -663,28 +663,19 @@ function renderRemoteControlCall(params: any, theme: any): Component {
   const action = typeof args.action === "string" && args.action ? args.action : "...";
   const stringArg = (value: unknown): string | undefined => typeof value === "string" ? value : undefined;
   let operand: string | undefined;
-  const context: string[] = [];
 
   if (action === "exec") {
     operand = `$ ${stringArg(args.remoteCommand) || "..."}`;
-    const cwd = stringArg(args.cwd);
-    if (cwd !== undefined) context.push(`cwd ${cwd || '""'}`);
-    if (typeof args.timeout === "number") context.push(`timeout ${args.timeout}s`);
   } else if (action === "connect") {
     operand = stringArg(args.command);
-    const cwd = stringArg(args.cwd);
-    if (cwd !== undefined) context.push(`cwd ${cwd || '""'}`);
   } else if (action === "forward") {
     const forwards = stringArg(args.forwards);
-    if (forwards === undefined) context.push("configured mappings");
-    else operand = forwards || "...";
+    if (forwards !== undefined) operand = forwards || "...";
   } else if (action === "chdir") {
     operand = stringArg(args.cwd) || "...";
   } else if (action === "note") {
     const note = stringArg(args.note);
     operand = note === undefined || note.trim() === "" ? "clear note" : note.trim();
-    const command = stringArg(args.command);
-    if (command) context.push(`endpoint ${command}`);
   } else if (action === "memory") {
     operand = stringArg(args.command);
   }
@@ -692,8 +683,7 @@ function renderRemoteControlCall(params: any, theme: any): Component {
   const title = theme.fg("toolTitle", theme.bold("remote"));
   const actionText = theme.fg("muted", ` ${action}`);
   const operandText = operand ? theme.fg("accent", `  ${operand}`) : "";
-  const contextText = context.length ? theme.fg("muted", ` (${context.join(", ")})`) : "";
-  return new Text(`${title}${actionText}${operandText}${contextText}`, 0, 0);
+  return new Text(`${title}${actionText}${operandText}`, 0, 0);
 }
 
 function renderRemoteControlResult(result: any, expanded: boolean, theme: any): Component {

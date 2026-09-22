@@ -16,6 +16,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   getAgentDir,
+  SettingsManager,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   createBashTool,
@@ -1402,7 +1403,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
   const localRead = createReadTool(localCwd);
   const localWrite = createWriteTool(localCwd);
   const localEdit = createEditTool(localCwd);
-  const localBash = createBashTool(localCwd);
+  let localBash = createBashTool(localCwd);
   const targetsLocalServerMemory = (path: unknown): boolean => {
     if (!remote || typeof path !== "string") return false;
     return resolve(path.replace(/^@/, "")) === serverMemoryFilePath(remote);
@@ -1777,6 +1778,13 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
 
   pi.on("turn_start", () => { turnOutputBytes = 0; });
   pi.on("session_start", async (event, ctx) => {
+    const settings = SettingsManager.create(ctx.cwd, getAgentDir(), {
+      projectTrusted: ctx.isProjectTrusted(),
+    });
+    localBash = createBashTool(ctx.cwd, {
+      shellPath: settings.getShellPath(),
+      commandPrefix: settings.getShellCommandPrefix(),
+    });
     currentCtx = ctx;
     sessionReady = true;
     status(ctx);

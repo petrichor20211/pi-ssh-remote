@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
+- Preserved Pi's configured `shellPath` and `shellCommandPrefix` for local agent Bash commands, including after returning from SSH, and refreshed them when the session starts or reloads.
 - Rendered each `remote` tool action and its command or primary argument in the tool-call header instead of showing only the tool name, while omitting supplementary cwd, timeout, and endpoint context.
 
 ## [0.1.13] - 2026-09-18

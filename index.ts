@@ -449,6 +449,12 @@ function withCompletionPrefix(items: AutocompleteItem[], commandPrefix: string):
   return items.map((item) => ({ ...item, value: `${commandPrefix}${item.label ?? item.value}` }));
 }
 
+function completionTokenPrefix(input: string): { prefix: string; currentToken: string } {
+  const match = input.match(/^(.*\s)(\S*)$/s);
+  if (!match) return { prefix: "", currentToken: input };
+  return { prefix: match[1] ?? "", currentToken: match[2] ?? "" };
+}
+
 function getRemoteArgumentCompletions(prefix: string): AutocompleteItem[] | null {
   const input = prefix.replace(/^\/?remote(?:\s+|$)/i, "");
   if (!input.includes(" ")) return filterAutocompleteItems(REMOTE_TOP_LEVEL_COMPLETIONS, input);
@@ -484,9 +490,9 @@ function getRemoteArgumentCompletions(prefix: string): AutocompleteItem[] | null
   if (execMatch) {
     const remainder = execMatch[1] ?? "";
     if (!remainder || remainder.startsWith("--")) {
-      const currentToken = remainder.split(/\s+/).at(-1) ?? "";
+      const { prefix: execPrefix, currentToken } = completionTokenPrefix(remainder);
       const matches = filterAutocompleteItems(REMOTE_EXEC_COMPLETIONS, currentToken);
-      return matches ? withCompletionPrefix(matches, "exec ") : null;
+      return matches ? withCompletionPrefix(matches, `exec ${execPrefix}`) : null;
     }
     return null;
   }

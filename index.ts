@@ -449,6 +449,10 @@ function withCompletionPrefix(items: AutocompleteItem[], commandPrefix: string):
   return items.map((item) => ({ ...item, value: `${commandPrefix}${item.label ?? item.value}` }));
 }
 
+function shouldAppendCompletionSpace(value: string): boolean {
+  return new Set(["ssh", "config", "use", "memory", "forward", "exec", "cd"]).has(value.toLowerCase());
+}
+
 function completionTokenPrefix(input: string): { prefix: string; currentToken: string } {
   const match = input.match(/^(.*\s)(\S*)$/s);
   if (!match) return { prefix: "", currentToken: input };
@@ -457,7 +461,14 @@ function completionTokenPrefix(input: string): { prefix: string; currentToken: s
 
 function getRemoteArgumentCompletions(prefix: string): AutocompleteItem[] | null {
   const input = prefix.replace(/^\/?remote(?:\s+|$)/i, "");
-  if (!input.includes(" ")) return filterAutocompleteItems(REMOTE_TOP_LEVEL_COMPLETIONS, input);
+  if (!input.includes(" ")) {
+    const matches = filterAutocompleteItems(REMOTE_TOP_LEVEL_COMPLETIONS, input);
+    if (!matches) return null;
+    return matches.map((item) => ({
+      ...item,
+      value: `${item.value}${shouldAppendCompletionSpace(item.value) ? " " : ""}`,
+    }));
+  }
 
   const useMatch = input.match(/^use\s+(.*)$/i);
   if (useMatch) {

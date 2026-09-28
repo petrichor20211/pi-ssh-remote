@@ -114,6 +114,20 @@ Pass an explicit local private key with `-i`:
 
 Identity paths must be absolute or start with `~/`. Unencrypted and passphrase-protected private keys are supported. Pi prompts for an encrypted key's passphrase and caches it only in the current process for reconnects; `/remote forget` clears it. When `-i` is present, that key is used exclusively instead of silently falling back to SSH agent or password authentication. Commands without `-i` keep the existing SSH agent and password flow unchanged.
 
+### Jump hosts (ProxyJump)
+
+Connect through one or more jump hosts without opening a local SSH tunnel:
+
+```text
+/remote ssh -J bastion@gateway.example.com:2222 developer@dev.internal
+/remote ssh -J bastion@gateway.example.com,relay@relay.internal developer@dev.internal
+/remote ssh -o ProxyJump=bastion@gateway.example.com developer@dev.internal
+```
+
+Each hop has its own host-key confirmation and SSH agent/password authentication. `-i` applies only to the destination; load jump-host keys into your local SSH agent. Jump ports default to 22, and omitted jump usernames default to the local user, not the destination user. Use brackets for IPv6 jump addresses, for example `user@[2001:db8::1]:2222`.
+
+Reconnects rebuild the same route. Disconnect closes the whole chain; `/remote forget` also clears cached credentials for its jump hosts. Jump servers must allow TCP forwarding to the next host. No direct-connection fallback is attempted if a jump fails.
+
 ## Examples
 
 ### 1. Let the agent investigate and repair a remote failure
@@ -230,7 +244,7 @@ New or changed host keys require interactive confirmation and are stored separat
 
 ## Current SSH scope
 
-The extension currently supports direct SSH commands with `-p`, `-l`, and `-i`. It does not yet consume `~/.ssh/config` or ProxyJump settings; use `-i` explicitly instead of relying on an `IdentityFile` entry.
+The extension supports `-p`, `-l`, `-i`, `-J`, and `-o ProxyJump=...` (including comma-separated jump chains). It does not read `~/.ssh/config`, resolve its host aliases, or support other `-o` options or `ProxyCommand`. Use explicit hostnames and `-i` for the destination key; use your SSH agent for jump-host keys.
 
 ## Releases
 

@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Added
 
-- None.
+- Added `-J` and `-o ProxyJump=...` support for single and multi-hop SSH connections, with per-hop host-key verification and authentication, route-preserving reconnects, and full-chain cleanup.
 
 ### Changed
 

@@ -306,9 +306,23 @@ pi install npm:pi-ssh-remote
 - 各项限制可以配置，但不能超过扩展的硬安全上限；
 - 折叠显示行数最大为 50，只影响界面，不会增加模型输出。
 
+## 跳板机（ProxyJump）
+
+无需手动创建本地 SSH 隧道，可直接通过一个或多个跳板机连接：
+
+```text
+/remote ssh -J bastion@gateway.example.com:2222 developer@dev.internal
+/remote ssh -J bastion@gateway.example.com,relay@relay.internal developer@dev.internal
+/remote ssh -o ProxyJump=bastion@gateway.example.com developer@dev.internal
+```
+
+每一跳分别确认主机密钥，并使用 SSH agent 或独立密码认证。`-i` 只用于目标主机；跳板机的私钥请先加入本地 SSH agent。跳板端口默认为 22，省略用户名时使用本地用户名，而非目标主机用户名。IPv6 跳板地址使用方括号，例如 `user@[2001:db8::1]:2222`。
+
+重连会重新建立同一路径；断开会关闭整条连接链；`/remote forget` 也会清除该路径中跳板机的缓存凭据。跳板服务器必须允许向下一跳转发 TCP 连接。任何跳板失败时都不会回退为直连。
+
 ## 当前限制
 
-目前只支持 SSH 直连，以及 `-p`、`-l`、`-i` 参数。暂不读取 `~/.ssh/config` 或 ProxyJump；如需指定私钥，请显式使用 `-i`，不要依赖 SSH config 中的 `IdentityFile`。
+支持 `-p`、`-l`、`-i`、`-J` 和 `-o ProxyJump=...`，包括逗号分隔的多跳路径。暂不读取 `~/.ssh/config`、解析其中的主机别名，也不支持其他 `-o` 参数或 `ProxyCommand`。请显式填写主机名，目标主机私钥使用 `-i`，跳板机私钥使用 SSH agent。
 
 ## 版本发布
 

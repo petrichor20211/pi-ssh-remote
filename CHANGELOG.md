@@ -8,7 +8,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+## [0.1.14] - 2026-09-28
+
+### Added
+
 - Added `-J` and `-o ProxyJump=...` support for single and multi-hop SSH connections, with per-hop host-key verification and authentication, route-preserving reconnects, and full-chain cleanup.
+- Added Pi argument completion for `/remote` subcommands, saved endpoints, config keys, and exec flags, including preserving already-entered `/remote exec` options while completing later flags.
 
 ### Changed
 
@@ -17,7 +32,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
-- Added Pi argument completion for `/remote` subcommands, saved endpoints, config keys, and exec flags, including preserving already-entered `/remote exec` options while completing later flags.
+- Made bare `/remote` connect to the endpoint selected by `/remote use` instead of prompting again for an SSH command.
 - Stopped suggesting already-complete `/remote` arguments so Enter submits the command instead of accepting a redundant completion, including when the cursor is immediately after `ssh` before the connection arguments.
 - Preserved Pi's configured `shellPath` and `shellCommandPrefix` for local agent Bash commands, including after returning from SSH, and refreshed them when the session starts or reloads.
 - Rendered each `remote` tool action and its command or primary argument in the tool-call header instead of showing only the tool name, while omitting supplementary cwd, timeout, and endpoint context.
@@ -241,7 +256,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 - None.
 
-[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.10...v0.1.11

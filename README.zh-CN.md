@@ -326,10 +326,11 @@ pi install npm:pi-ssh-remote
 
 ## 版本发布
 
-最新版本：[v0.1.13](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.13)
+最新版本：[v0.1.14](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.14)
 
 | 版本 | 日期 | 主要内容 |
 |---|---|---|
+| [0.1.14](CHANGELOG.md#0114---2026-09-28) | 2026-09-28 | ProxyJump 跳板连接、`/remote` 参数补全及更清晰的 SSH 工具路由 |
 | [0.1.13](CHANGELOG.md#0113---2026-09-18) | 2026-09-18 | 工作目录不可用时平滑回退、延长 SSH 握手等待并修复 Windows 路径 |
 | [0.1.12](CHANGELOG.md#0112---2026-08-25) | 2026-08-25 | 安全处理 SSH 握手期间断线所触发的连续错误 |
 | [0.1.11](CHANGELOG.md#0111---2026-08-16) | 2026-08-16 | JSON 记忆条目、Prompt 引导增删查改与 `/remote memory` 展示命令 |

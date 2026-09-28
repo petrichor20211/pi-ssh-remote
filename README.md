@@ -252,10 +252,11 @@ The extension supports `-p`, `-l`, `-i`, `-J`, and `-o ProxyJump=...` (including
 
 ## Releases
 
-Latest release: [v0.1.13](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.13)
+Latest release: [v0.1.14](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.14)
 
 | Version | Date | Highlights |
 |---|---|---|
+| [0.1.14](CHANGELOG.md#0114---2026-09-28) | 2026-09-28 | ProxyJump connections, `/remote` argument completion, and clearer SSH tool routing |
 | [0.1.13](CHANGELOG.md#0113---2026-09-18) | 2026-09-18 | Graceful working-directory fallback, longer SSH handshakes, and Windows path fixes |
 | [0.1.12](CHANGELOG.md#0112---2026-08-25) | 2026-08-25 | Safe handling of repeated SSH errors when a connection is lost during handshake |
 | [0.1.11](CHANGELOG.md#0111---2026-08-16) | 2026-08-16 | JSON memory entries, prompt-guided CRUD, and `/remote memory` listing |

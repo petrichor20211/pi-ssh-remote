@@ -12,10 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Changed
 
-- None.
+- Removed automatic trailing spaces from `/remote` subcommand completions, leaving users to type the separator before entering the next argument.
+- Updated both README command examples and tables to use the canonical `/remote disconnect` command.
 
 ### Fixed
 
+- Added Pi argument completion for `/remote` subcommands, saved endpoints, config keys, and exec flags, including preserving already-entered `/remote exec` options while completing later flags.
+- Stopped suggesting already-complete `/remote` arguments so Enter submits the command instead of accepting a redundant completion, including when the cursor is immediately after `ssh` before the connection arguments.
 - Preserved Pi's configured `shellPath` and `shellCommandPrefix` for local agent Bash commands, including after returning from SSH, and refreshed them when the session starts or reloads.
 - Rendered each `remote` tool action and its command or primary argument in the tool-call header instead of showing only the tool name, while omitting supplementary cwd, timeout, and endpoint context.
 - Made the active SSH directory and transparent `read`, `write`, `edit`, and `bash` routing explicit through structured prompt state and ordinary tool descriptions, instead of relying on an exact-text system-prompt replacement.

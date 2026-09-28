@@ -120,7 +120,7 @@ pi install npm:pi-ssh-remote
 需要返回本地时执行：
 
 ```text
-/remote off
+/remote disconnect
 ```
 
 ### 服务器记忆
@@ -267,7 +267,7 @@ pi install npm:pi-ssh-remote
 | `/remote config turn-max-bytes 32768` | 设置每轮远端工具总输出预算 |
 | `/remote status` | 查看当前连接和工作目录 |
 | `/remote reload` | 重新连接当前服务器 |
-| `/remote off` | 断开连接并返回本地 |
+| `/remote disconnect` | 断开连接并返回本地 |
 | `/remote forget` | 断开连接并清除内存中的密码和密钥 passphrase |
 
 ## 配置保存在哪里

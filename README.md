@@ -78,7 +78,7 @@ H100 training server (root@gpu-box.example.com:2202):/srv/project
 Return to local tools with:
 
 ```text
-/remote off
+/remote disconnect
 ```
 
 ### Server memory
@@ -213,8 +213,12 @@ tools on the local repository.
 | `/remote config turn-max-bytes 32768` | Set the aggregate per-turn remote output budget |
 | `/remote status` | Show the active workspace |
 | `/remote reload` | Reconnect the active workspace |
-| `/remote off` | Disconnect and return tools to local execution |
+| `/remote disconnect` | Disconnect and return tools to local execution |
 | `/remote forget` | Disconnect and clear cached passwords and key passphrases |
+
+### Slash-command completion
+
+`/remote` supports Pi argument completion. Try typing a partial subcommand like `/remote sta` to complete `status`, or `/remote use ` to choose from saved endpoints.
 
 ## Persistence, output, and security
 

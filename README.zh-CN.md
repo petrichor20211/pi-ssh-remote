@@ -154,7 +154,7 @@ pi install npm:pi-ssh-remote
 /remote ssh -i ~/.ssh/id_ed25519 root@gpu-box.example.com -p 2202
 ```
 
-密钥路径必须是绝对路径或以 `~/` 开头。插件支持未加密私钥和带 passphrase 的私钥；对于加密私钥，Pi 会以遮罩方式询问 passphrase，并仅在当前进程内缓存以便自动重连，`/remote forget` 会清除它。指定 `-i` 后只使用该私钥，不会静默回退到 SSH Agent 或密码；不带 `-i` 的旧命令仍保持原有的 SSH Agent 和密码登录流程。
+密钥路径必须是绝对路径或以 `~/` 开头。插件支持未加密私钥和带 passphrase 的私钥；对于加密私钥，Pi 会以遮罩方式询问 passphrase，并仅在当前进程内缓存以便自动重连，`/remote forget` 会清除它。指定 `-i` 后只使用该私钥，不会静默回退到 SSH Agent 或密码；不带 `-i` 时，每台主机依次尝试 SSH Agent、配置或默认私钥，最后才使用缓存密码或询问密码。默认私钥为 `~/.ssh/id_ed25519`、`~/.ssh/id_ecdsa` 和 `~/.ssh/id_rsa`，不存在的文件会跳过。
 
 ## 常见用法
 
@@ -244,7 +244,7 @@ pi install npm:pi-ssh-remote
 
 | 命令 | 作用 |
 |---|---|
-| `/remote ssh USER@HOST -p PORT [-i KEY]` | 保存并使用 Agent／密码或指定私钥连接服务器 |
+| `/remote ssh USER@HOST -p PORT [-i KEY]` | 保存并使用 SSH 配置、Agent、私钥或密码连接服务器 |
 | `/remote` | 连接当前选中的服务器，或提示输入 SSH 地址 |
 | `/remote config` | 查看已保存的服务器和配置 |
 | `/remote use USER@HOST:PORT` | 切换到指定服务器 |
@@ -316,13 +316,32 @@ pi install npm:pi-ssh-remote
 /remote ssh -o ProxyJump=bastion@gateway.example.com developer@dev.internal
 ```
 
-每一跳分别确认主机密钥，并使用 SSH agent 或独立密码认证。`-i` 只用于目标主机；跳板机的私钥请先加入本地 SSH agent。跳板端口默认为 22，省略用户名时使用本地用户名，而非目标主机用户名。IPv6 跳板地址使用方括号，例如 `user@[2001:db8::1]:2222`。
+每一跳独立确认主机密钥、解析 SSH 配置并认证。`-i` 只用于目标主机；跳板机使用自己的配置／默认私钥或 SSH Agent。没有命令行或配置覆盖时，跳板端口默认为 22，用户名默认为本地用户名，而非目标主机用户名。IPv6 跳板地址使用方括号，例如 `user@[2001:db8::1]:2222`。
 
 重连会重新建立同一路径；断开会关闭整条连接链；`/remote forget` 也会清除该路径中跳板机的缓存凭据。跳板服务器必须允许向下一跳转发 TCP 连接。任何跳板失败时都不会回退为直连。
 
 ## 当前限制
 
-支持 `-p`、`-l`、`-i`、`-J` 和 `-o ProxyJump=...`，包括逗号分隔的多跳路径。暂不读取 `~/.ssh/config`、解析其中的主机别名，也不支持其他 `-o` 参数或 `ProxyCommand`。请显式填写主机名，目标主机私钥使用 `-i`，跳板机私钥使用 SSH agent。
+连接仍使用 Node.js `ssh2` 库，不依赖本地 OpenSSH 可执行程序。命令参数支持 `-p`、`-l`、`-i`、`-J` 和 `-o ProxyJump=...`，包括逗号分隔的多跳路径。
+
+读取 `~/.ssh/config` 中的 `Host` 通配／排除规则、`HostName`、`User`、`Port`、`IdentityFile`（可多条）、`IdentityAgent`、`IdentitiesOnly` 和 `ProxyJump`。命令行参数优先，每个跳板机独立解析。例如：
+
+```sshconfig
+Host gateway
+    HostName gateway.example.com
+    User bastion
+    IdentityFile ~/.ssh/gateway_key
+
+Host work
+    HostName dev.internal
+    User developer
+    ProxyJump gateway
+    IdentityFile ~/.ssh/work_key
+```
+
+使用 `/remote ssh work` 即可连接。未配置 `IdentityFile` 时，每一跳都会尝试上述默认私钥；因此普通 `ssh -J ...` 路径在两端均接受默认密钥时，也无需 SSH Agent。
+
+这只是明确支持的配置子集，不是完整 OpenSSH 兼容层：不读取系统 SSH 配置；拒绝 `Match` 段及对当前主机生效的 `Include`、`ProxyCommand` 或主机名规范化配置，其他配置项未实现。`IdentitiesOnly yes` 会完全禁用 Agent 认证，`IdentityAgent none` 同样禁用它。配置中的相对密钥路径以用户主目录为基准，支持 `~/` 和 `%d/%h/%n/%p/%r/%u/%%` token。
 
 ## 版本发布
 

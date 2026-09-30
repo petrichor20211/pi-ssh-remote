@@ -13,6 +13,7 @@
   ],
   "files": [
     "index.ts",
+    "src",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",
@@ -30,6 +31,7 @@
     "url": "https://github.com/petrichor20211/pi-ssh-remote/issues"
   },
   "dependencies": {
+    "ssh-config": "^5.3.0",
     "ssh2": "^1.17.0"
   },
   "peerDependencies": {

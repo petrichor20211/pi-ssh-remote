@@ -6,11 +6,11 @@
  * credentials, remote working directories, reconnection, and TCP forwarding.
  */
 
-import ssh2, { type Client as SshClient, type ClientChannel, type ConnectConfig, type SFTPWrapper } from "ssh2";
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, statSync, writeFileSync, writeSync } from "node:fs";
-import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import type { Client as SshClient, ClientChannel, SFTPWrapper } from "ssh2";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
+import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { createServer, type Server, type Socket } from "node:net";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -34,17 +34,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, Key, Text, matchesKey, truncateToWidth, type AutocompleteItem, type Component, type Focusable } from "@earendil-works/pi-tui";
 
-const { Client, utils: ssh2Utils } = ssh2;
-
-interface ParsedSsh {
-  host: string;
-  port: number;
-  username: string;
-  identityFile?: string;
-  jumps?: ParsedSsh[];
-  label: string;
-  command: string;
-}
+import { quote, shellWords } from "./src/shell.ts";
+import { cacheId, parseSshCommand, type ParsedSsh } from "./src/ssh/config.ts";
+import { createSshAuthenticator, type SshCredentialCache } from "./src/ssh/auth.ts";
+import { jumpSocket, probeFingerprint } from "./src/ssh/connection.ts";
 
 interface RemoteState extends ParsedSsh {
   client: SshClient;
@@ -52,9 +45,7 @@ interface RemoteState extends ParsedSsh {
   unavailableCwd?: string;
 }
 
-interface CredentialCache {
-  passwords: Map<string, string>;
-  keyPassphrases: Map<string, string>;
+interface CredentialCache extends SshCredentialCache {
   resume?: { command: string; cwd: string; routeRemoteTools: boolean; forwards?: string[] };
 }
 
@@ -124,10 +115,8 @@ const DEFAULT_EXEC_MAX_BYTES = 8 * 1024;
 const DEFAULT_TURN_MAX_BYTES = 32 * 1024;
 const MIN_MODEL_OUTPUT_BYTES = 1024;
 const OUTPUT_FOOTER_RESERVE_BYTES = 512;
-const SSH_HANDSHAKE_TIMEOUT_MS = 30_000;
 const DEFAULT_REMOTE_TIMEOUT_SECONDS = 30;
 const MAX_REMOTE_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
-const MAX_PRIVATE_KEY_BYTES = 1024 * 1024;
 const SESSION_STATE_ENTRY_TYPE = "pi-ssh-remote-state";
 const CACHE_KEY = "__piHpcCredentialCacheV1";
 const REMOTE_FILE_TOOL_ROUTING_DESCRIPTION = "With SSH routing active, this tool operates directly on the remote workspace.";
@@ -136,159 +125,8 @@ const cacheHost = globalThis as typeof globalThis & { [CACHE_KEY]?: CredentialCa
 const credentialCache = cacheHost[CACHE_KEY] ??= { passwords: new Map<string, string>(), keyPassphrases: new Map<string, string>() };
 credentialCache.keyPassphrases ??= new Map<string, string>();
 
-function shellWords(input: string): string[] {
-  const words: string[] = [];
-  let word = "";
-  let quoteChar: "'" | '"' | null = null;
-  let escaped = false;
-  for (const ch of input.trim()) {
-    if (escaped) { word += ch; escaped = false; continue; }
-    if (ch === "\\" && quoteChar !== "'") { escaped = true; continue; }
-    if (quoteChar) { if (ch === quoteChar) quoteChar = null; else word += ch; continue; }
-    if (ch === "'" || ch === '"') { quoteChar = ch; continue; }
-    if (/\s/.test(ch)) { if (word) { words.push(word); word = ""; } }
-    else word += ch;
-  }
-  if (escaped || quoteChar) throw new Error("Incomplete quoting or escaping in SSH command");
-  if (word) words.push(word);
-  return words;
-}
-
-function isHomeRelativePath(filePath: string): boolean {
-  return filePath === "~" || filePath.startsWith("~/");
-}
-
-function parseSshCommand(command: string): ParsedSsh {
-  const args = shellWords(command);
-  if (args[0] !== "ssh") throw new Error("Command must start with ssh, for example: ssh root@host -p 22");
-  let port = 22;
-  let username = process.env.USER || "root";
-  let identityFile: string | undefined;
-  let target: string | undefined;
-  let proxyJump: string | undefined;
-  for (let i = 1; i < args.length; i++) {
-    const arg = args[i]!;
-    if (arg === "-p") { port = Number(args[++i]); continue; }
-    if (arg.startsWith("-p") && arg.length > 2) { port = Number(arg.slice(2)); continue; }
-    if (arg === "-l") { username = args[++i] || username; continue; }
-    if (arg === "-i") {
-      if (identityFile !== undefined) throw new Error("Only one SSH identity file may be specified");
-      identityFile = args[++i];
-      if (!identityFile) throw new Error("SSH option -i requires a private key path");
-      continue;
-    }
-    if (arg.startsWith("-i") && arg.length > 2) {
-      if (identityFile !== undefined) throw new Error("Only one SSH identity file may be specified");
-      identityFile = arg.slice(2);
-      continue;
-    }
-    if (arg.startsWith("-J") || arg.startsWith("-o")) {
-      let value = arg.length === 2 ? args[++i] : arg.slice(2);
-      if (arg.startsWith("-o")) {
-        const option = value?.match(/^ProxyJump(?:=|\s+)(.+)$/i);
-        if (!option) throw new Error("Only -o ProxyJump=... is supported");
-        value = option[1];
-      }
-      if (!value || value.startsWith("-")) throw new Error("SSH option -J requires a jump host");
-      if (proxyJump !== undefined) throw new Error("Specify one ProxyJump list; separate multiple jump hosts with commas");
-      proxyJump = value;
-      continue;
-    }
-    if (arg.startsWith("-")) throw new Error(`Unsupported SSH option ${arg}; only -p, -l, -i, -J, and -o ProxyJump=... are supported`);
-    if (!target) target = arg;
-    else throw new Error("Unexpected extra argument in SSH command");
-  }
-  if (!target || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid SSH host or port");
-  if (identityFile && !isHomeRelativePath(identityFile) && !isAbsolute(identityFile)) {
-    throw new Error("SSH identity file must use an absolute path or ~/...");
-  }
-  const at = target.lastIndexOf("@");
-  const host = at >= 0 ? target.slice(at + 1) : target;
-  if (at >= 0) username = target.slice(0, at);
-  if (!host || !username) throw new Error("Invalid SSH username or host");
-  const jumps = proxyJump && proxyJump !== "none" ? proxyJump.split(",").map((value) => {
-    const match = value.match(/^(?:([^@\s,]+)@)?(\[[^\]\s]+\]|[^:@\s,]+)(?::(\d+))?$/);
-    if (!match) throw new Error(`Invalid SSH jump host: ${value}; expected [USER@]HOST[:PORT]`);
-    const jumpHost = match[2]!.replace(/^\[|\]$/g, "");
-    const jumpPort = Number(match[3] ?? 22);
-    if (jumpPort < 1 || jumpPort > 65535) throw new Error(`Invalid SSH jump port: ${value}`);
-    const jumpUser = match[1] ?? (process.env.USER || "root");
-    return { host: jumpHost, port: jumpPort, username: jumpUser, label: `${jumpUser}@${jumpHost}:${jumpPort}`, command: `ssh ${quote(`${jumpUser}@${jumpHost}`)} -p ${jumpPort}` };
-  }) : [];
-  return { host, port, username, ...(identityFile ? { identityFile } : {}), ...(jumps.length ? { jumps } : {}), label: `${username}@${host}:${port}`, command };
-}
-
-function cacheId(config: ParsedSsh): string {
-  return `${config.username}@${config.host}:${config.port}`;
-}
-
 function serverMemoryId(config: ParsedSsh): string {
   return `${config.username}@${config.host}`;
-}
-
-function getCachedPassword(config: ParsedSsh): string | undefined {
-  return credentialCache.passwords.get(cacheId(config));
-}
-
-function setCachedPassword(config: ParsedSsh, password: string): void {
-  credentialCache.passwords.set(cacheId(config), password);
-}
-
-function deleteCachedPassword(config: ParsedSsh): void {
-  credentialCache.passwords.delete(cacheId(config));
-}
-
-function resolveIdentityPath(config: ParsedSsh): string {
-  if (!config.identityFile) throw new Error("No SSH identity file is configured");
-  // Expand ~ with the user home directory, not Pi's agent directory.
-  if (isHomeRelativePath(config.identityFile)) {
-    return config.identityFile === "~" ? homedir() : join(homedir(), config.identityFile.slice(2));
-  }
-  return config.identityFile;
-}
-
-function keyPassphraseId(config: ParsedSsh): string {
-  return `${cacheId(config)}|${resolveIdentityPath(config)}`;
-}
-
-function getCachedKeyPassphrase(config: ParsedSsh): string | undefined {
-  return credentialCache.keyPassphrases.get(keyPassphraseId(config));
-}
-
-function setCachedKeyPassphrase(config: ParsedSsh, passphrase: string): void {
-  credentialCache.keyPassphrases.set(keyPassphraseId(config), passphrase);
-}
-
-function deleteCachedKeyPassphrase(config: ParsedSsh): void {
-  if (config.identityFile) credentialCache.keyPassphrases.delete(keyPassphraseId(config));
-}
-
-function readPrivateKey(config: ParsedSsh): Buffer {
-  const path = resolveIdentityPath(config);
-  let stat;
-  try { stat = statSync(path); }
-  catch (error) { throw new Error(`Cannot access SSH private key ${path}: ${(error as Error).message}`); }
-  if (!stat.isFile()) throw new Error(`SSH private key is not a regular file: ${path}`);
-  if (stat.size > MAX_PRIVATE_KEY_BYTES) throw new Error(`SSH private key exceeds the ${MAX_PRIVATE_KEY_BYTES}-byte limit: ${path}`);
-  try { return readFileSync(path); }
-  catch (error) { throw new Error(`Cannot read SSH private key ${path}: ${(error as Error).message}`); }
-}
-
-function parsePrivateKey(keyData: Buffer, passphrase?: string): any | Error {
-  let parsed: any;
-  try { parsed = ssh2Utils.parseKey(keyData, passphrase); }
-  catch (error) { return error as Error; }
-  if (parsed instanceof Error) return parsed;
-  const keys = Array.isArray(parsed) ? parsed : [parsed];
-  const privateKeys = keys.filter((key) => key?.isPrivateKey?.());
-  if (privateKeys.length !== 1) {
-    return new Error(privateKeys.length ? "SSH identity files containing multiple private keys are not supported" : "SSH identity file does not contain a private key");
-  }
-  return privateKeys[0];
-}
-
-function isPassphraseError(error: Error): boolean {
-  return /passphrase|encrypted private/i.test(error.message);
 }
 
 function parseForwardSpec(value: string): ForwardSpec {
@@ -301,10 +139,6 @@ function parseForwardSpec(value: string): ForwardSpec {
     throw new Error(`Port out of range in forwarding specification: ${value}`);
   }
   return { localPort, remoteHost, remotePort };
-}
-
-function quote(value: string): string {
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function parseBoundedInteger(value: unknown, label: string, maximum: number): number {
@@ -843,86 +677,6 @@ function renderRemoteControlResult(result: any, expanded: boolean, theme: any): 
   };
 }
 
-function probeFingerprint(config: ParsedSsh, sock?: ClientChannel): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const client = new Client();
-    let settled = false;
-    const fail = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      client.destroy();
-      reject(error);
-    };
-    const timer = setTimeout(() => fail(new Error("Connection timed out")), SSH_HANDSHAKE_TIMEOUT_MS + 2000);
-    client.on("error", fail);
-    client.once("close", () => fail(new Error("SSH connection closed before host verification")));
-    const options: ConnectConfig = {
-      ...(sock ? { sock } : {}),
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      readyTimeout: SSH_HANDSHAKE_TIMEOUT_MS,
-      hostHash: "sha256",
-      hostVerifier: (hash) => {
-        if (!settled) { settled = true; clearTimeout(timer); resolve(hash); }
-        setImmediate(() => client.end());
-        return false;
-      },
-    };
-    try { client.connect(options); }
-    catch (error) { fail(error as Error); }
-  });
-}
-
-type SshAuthentication = Partial<Pick<ConnectConfig, "password" | "privateKey" | "passphrase" | "agent">>;
-
-function connect(config: ParsedSsh, authentication: SshAuthentication, fingerprint: string, sock?: ClientChannel): Promise<SshClient> {
-  return new Promise((resolve, reject) => {
-    const client = new Client();
-    const options: ConnectConfig = {
-      ...(sock ? { sock } : {}),
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      ...authentication,
-      readyTimeout: SSH_HANDSHAKE_TIMEOUT_MS,
-      keepaliveInterval: 15000,
-      keepaliveCountMax: 3,
-      hostHash: "sha256",
-      hostVerifier: (hash) => hash === fingerprint,
-    };
-    client.once("ready", () => resolve(client));
-    // ssh2 may emit a socket error followed by a protocol error while a
-    // connection is lost during handshake. Keep consuming client errors after
-    // the first one so EventEmitter does not turn the follow-up into an
-    // uncaught exception; rejecting an already-settled promise is a no-op.
-    client.on("error", (error) => { client.destroy(); reject(error); });
-    client.once("close", () => reject(new Error("SSH connection closed before ready")));
-    try { client.connect(options); }
-    catch (error) { client.destroy(); reject(error); }
-  });
-}
-
-function jumpSocket(client: SshClient, target: ParsedSsh): Promise<ClientChannel> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error?: Error, stream?: ClientChannel) => {
-      if (settled) { stream?.destroy(); return; }
-      settled = true;
-      clearTimeout(timer);
-      client.removeListener("close", onClose);
-      if (error) reject(error);
-      else resolve(stream!);
-    };
-    const onClose = () => finish(new Error("SSH jump connection closed"));
-    const timer = setTimeout(() => finish(new Error(`SSH jump forwarding to ${target.label} timed out`)), SSH_HANDSHAKE_TIMEOUT_MS);
-    client.once("close", onClose);
-    try { client.forwardOut("127.0.0.1", 0, target.host, target.port, (error, stream) => finish(error, stream)); }
-    catch (error) { finish(error as Error); }
-  });
-}
-
 function execRemote(
   client: SshClient,
   command: string,
@@ -1048,6 +802,7 @@ async function askSecret(ctx: any, label: string, placeholder: string): Promise<
 
 export default function sshRemoteExtension(pi: ExtensionAPI) {
   migrateLegacyServerMemories();
+  const auth = createSshAuthenticator(credentialCache);
 
   const localCwd = process.cwd();
   let remote: RemoteState | null = null;
@@ -1094,33 +849,6 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     details: { summary: message.split("\n")[0] },
     isError: true,
   });
-
-  const standardAuthentication = (password?: string): SshAuthentication => ({
-    ...(password ? { password } : {}),
-    ...(process.env.SSH_AUTH_SOCK ? { agent: process.env.SSH_AUTH_SOCK } : {}),
-  });
-
-  const privateKeyAuthentication = async (parsed: ParsedSsh, ctx?: any): Promise<SshAuthentication> => {
-    const keyData = readPrivateKey(parsed);
-    let passphrase = getCachedKeyPassphrase(parsed);
-    let privateKey = parsePrivateKey(keyData, passphrase);
-    if (privateKey instanceof Error && isPassphraseError(privateKey)) {
-      if (passphrase) deleteCachedKeyPassphrase(parsed);
-      if (!ctx) throw new Error(`SSH private key ${resolveIdentityPath(parsed)} requires its passphrase again; reconnect interactively`);
-      passphrase = await askSecret(ctx, `Passphrase for ${parsed.identityFile}`, "private key passphrase") ?? undefined;
-      if (!passphrase) throw new Error("No SSH private key passphrase was provided");
-      privateKey = parsePrivateKey(keyData, passphrase);
-      if (privateKey instanceof Error) {
-        deleteCachedKeyPassphrase(parsed);
-        throw new Error(`Could not unlock SSH private key ${resolveIdentityPath(parsed)}: ${privateKey.message}`);
-      }
-      setCachedKeyPassphrase(parsed, passphrase);
-    }
-    if (privateKey instanceof Error) {
-      throw new Error(`Invalid SSH private key ${resolveIdentityPath(parsed)}: ${privateKey.message}`);
-    }
-    return { privateKey: keyData, ...(passphrase ? { passphrase } : {}) };
-  };
 
   const mapPath = (path: string): string => {
     if (!remote) return path;
@@ -1277,25 +1005,11 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
           fingerprint = probed;
         }
         if (!fingerprint) throw new Error(`Host ${key} is not trusted; connect interactively with /remote first`);
-        let password = getCachedPassword(hop);
-        const authentication = hop.identityFile
-          ? await privateKeyAuthentication(hop, ctx)
-          : standardAuthentication(password);
-        let client: SshClient;
-        try {
-          client = await connect(hop, authentication, fingerprint, await socket());
-        } catch (error) {
-          if (hop.identityFile || !/authentication methods failed|authentication failure/i.test((error as Error).message)) throw error;
-          deleteCachedPassword(hop);
-          if (!ctx) throw error;
-          password = await askSecret(ctx, `SSH password for ${hop.label}`, "password") ?? undefined;
-          if (!password) throw new Error(`No SSH password was provided for ${hop.label} and SSH agent authentication failed`);
-          client = await connect(hop, standardAuthentication(password), fingerprint, await socket());
-        }
+        const client = await auth.authenticateHop(hop, fingerprint, socket,
+          ctx ? (label, placeholder) => askSecret(ctx, label, placeholder) : undefined);
         if (closed) { client.destroy(); throw new Error("SSH jump connection closed during connection setup"); }
         clients.push(client);
         client.once("close", closeRoute);
-        if (!hop.identityFile && password) setCachedPassword(hop, password);
       }
       return clients.at(-1)!;
     } catch (error) {
@@ -1527,8 +1241,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       })();
       if (configured) {
         for (const hop of [...(configured.jumps ?? []), configured]) {
-          deleteCachedPassword(hop);
-          deleteCachedKeyPassphrase(hop);
+          auth.forget(hop);
         }
       }
     }
@@ -1670,7 +1383,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "remote",
     label: "Remote",
-    description: "Connect, reconnect, annotate endpoints, locate server-specific memory, change the persistent remote working directory, inspect, forward ports, run remote SSH commands, or disconnect the configured SSH environment. Server memory is managed as JSON entries with Pi's read, write, and edit tools. Connections support SSH agent, password, an explicit local private key with -i, and jump hosts via -J or -o ProxyJump. Exec output is streamed to bounded buffers; model output defaults to the last 200 lines or 8KB, while complete oversized output is saved locally. Passwords and key passphrases are never accepted as arguments and are cached only in process memory.",
+    description: "Connect, reconnect, annotate endpoints, locate server-specific memory, change the persistent remote working directory, inspect, forward ports, run remote SSH commands, or disconnect the configured SSH environment. Server memory is managed as JSON entries with Pi's read, write, and edit tools. Connections resolve ~/.ssh/config host aliases and per-hop keys, try SSH agent and private keys before passwords, and support an exclusive destination key with -i and jump hosts via -J or -o ProxyJump. Exec output is streamed to bounded buffers; model output defaults to the last 200 lines or 8KB, while complete oversized output is saved locally. Passwords and key passphrases are never accepted as arguments and are cached only in process memory.",
     promptSnippet: "Control the configured remote SSH connection, endpoint note and memory location, working directory, and local port forwarding",
     promptGuidelines: [
       "Use remote when the user asks the agent to enter, reconnect, inspect, or leave a remote SSH environment. Use action reconnect without command to restore the saved SSH route, including after disconnect; action status shows the full SSH command.",

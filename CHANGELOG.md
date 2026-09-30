@@ -8,14 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Added
 
-- None.
+- Added per-host `~/.ssh/config` resolution for host aliases/patterns, connection settings, identity files/agent, and ProxyJump, with independent configuration for every hop.
+- Added default Ed25519, ECDSA, and RSA private-key discovery for destinations and jump hosts without requiring OpenSSH.
 
 ### Changed
 
+- Try SSH agent and configured/default private keys before cached or prompted passwords; explicit destination `-i` remains exclusive.
+- Separated SSH configuration, authentication, and connection handling into focused TypeScript modules, with UI-independent credential prompting.
 - Kept connection-result UI to a fixed one-line summary, with full connection details available to the agent and through `/remote status`; jump connections include a compact `via` label.
 
 ### Fixed
 
+- Avoid unnecessary password prompts on jump routes when a usable local default or configured private key is available.
 - Exposed the complete SSH command in agent context, connection/status/disconnect results, and connection failures instead of identifying jump-relative targets only by host and port.
 - Retained the saved SSH command and last remote directory after disconnect and session reload, allowing an explicit no-argument reconnect to rebuild the same route without automatically reconnecting a disconnected session.
 - Included the attempted SSH hop in connection-setup errors.

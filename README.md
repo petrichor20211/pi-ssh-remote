@@ -112,7 +112,7 @@ Pass an explicit local private key with `-i`:
 /remote ssh -i ~/.ssh/id_ed25519 root@gpu-box.example.com -p 2202
 ```
 
-Identity paths must be absolute or start with `~/`. Unencrypted and passphrase-protected private keys are supported. Pi prompts for an encrypted key's passphrase and caches it only in the current process for reconnects; `/remote forget` clears it. When `-i` is present, that key is used exclusively instead of silently falling back to SSH agent or password authentication. Commands without `-i` keep the existing SSH agent and password flow unchanged.
+Identity paths must be absolute or start with `~/`. Unencrypted and passphrase-protected private keys are supported. Pi prompts for an encrypted key's passphrase and caches it only in the current process for reconnects; `/remote forget` clears it. When `-i` is present, that key is used exclusively instead of silently falling back to SSH agent or password authentication. Without `-i`, each host tries its SSH agent, configured or default key files, then a cached or prompted password. Default keys are `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`, and `~/.ssh/id_rsa`; missing files are skipped.
 
 ### Jump hosts (ProxyJump)
 
@@ -124,7 +124,7 @@ Connect through one or more jump hosts without opening a local SSH tunnel:
 /remote ssh -o ProxyJump=bastion@gateway.example.com developer@dev.internal
 ```
 
-Each hop has its own host-key confirmation and SSH agent/password authentication. `-i` applies only to the destination; load jump-host keys into your local SSH agent. Jump ports default to 22, and omitted jump usernames default to the local user, not the destination user. Use brackets for IPv6 jump addresses, for example `user@[2001:db8::1]:2222`.
+Each hop has its own host-key confirmation, SSH configuration, and authentication. `-i` applies only to the destination; jump hosts use their own configured/default keys or agent. Without command-line or config overrides, jump ports default to 22 and usernames default to the local user, not the destination user. Use brackets for IPv6 jump addresses, for example `user@[2001:db8::1]:2222`.
 
 Reconnects rebuild the same route. Disconnect closes the whole chain; `/remote forget` also clears cached credentials for its jump hosts. Jump servers must allow TCP forwarding to the next host. No direct-connection fallback is attempted if a jump fails.
 
@@ -204,7 +204,7 @@ tools on the local repository.
 
 | Command | Purpose |
 |---|---|
-| `/remote ssh USER@HOST -p PORT [-i KEY]` | Save, select, and connect using agent/password or an explicit private key |
+| `/remote ssh USER@HOST -p PORT [-i KEY]` | Save, select, and connect using SSH config, agent, key files, or password |
 | `/remote` | Connect to the selected endpoint or prompt for one |
 | `/remote config` | List saved endpoints and settings |
 | `/remote use USER@HOST:PORT` | Select a saved endpoint |
@@ -248,7 +248,26 @@ New or changed host keys require interactive confirmation and are stored separat
 
 ## Current SSH scope
 
-The extension supports `-p`, `-l`, `-i`, `-J`, and `-o ProxyJump=...` (including comma-separated jump chains). It does not read `~/.ssh/config`, resolve its host aliases, or support other `-o` options or `ProxyCommand`. Use explicit hostnames and `-i` for the destination key; use your SSH agent for jump-host keys.
+Connections use the Node.js `ssh2` library; no local OpenSSH executable is required. Command options are `-p`, `-l`, `-i`, `-J`, and `-o ProxyJump=...` (including comma-separated jump chains).
+
+`~/.ssh/config` supports `Host` patterns/negation, `HostName`, `User`, `Port`, `IdentityFile` (multiple entries), `IdentityAgent`, `IdentitiesOnly`, and `ProxyJump`. Command-line options take precedence, and every jump host is resolved independently. For example:
+
+```sshconfig
+Host gateway
+    HostName gateway.example.com
+    User bastion
+    IdentityFile ~/.ssh/gateway_key
+
+Host work
+    HostName dev.internal
+    User developer
+    ProxyJump gateway
+    IdentityFile ~/.ssh/work_key
+```
+
+Connect with `/remote ssh work`. Without `IdentityFile`, the default keys above are tried on each host, so ordinary `ssh -J ...` routes also work without an agent when both hosts accept a default key.
+
+This is a supported subset, not full OpenSSH compatibility: system SSH config is not read; `Match` sections and applicable `Include`, `ProxyCommand`, or hostname canonicalization are rejected. Other config directives are not implemented. `IdentitiesOnly yes` disables agent authentication entirely; `IdentityAgent none` also disables it. Config key paths resolve relative to the home directory and support `~/` and `%d/%h/%n/%p/%r/%u/%%` tokens.
 
 ## Releases
 

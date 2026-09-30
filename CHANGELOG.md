@@ -12,11 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Changed
 
-- None.
+- Kept connection-result UI to a fixed one-line summary, with full connection details available to the agent and through `/remote status`; jump connections include a compact `via` label.
 
 ### Fixed
 
-- None.
+- Exposed the complete SSH command in agent context, connection/status/disconnect results, and connection failures instead of identifying jump-relative targets only by host and port.
+- Retained the saved SSH command and last remote directory after disconnect and session reload, allowing an explicit no-argument reconnect to rebuild the same route without automatically reconnecting a disconnected session.
+- Included the attempted SSH hop in connection-setup errors.
 
 ## [0.1.14] - 2026-09-28
 

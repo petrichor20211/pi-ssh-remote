@@ -265,8 +265,8 @@ pi install npm:pi-ssh-remote
 | `/remote config exec-max-lines 200` | 设置远端命令行数预算 |
 | `/remote config exec-max-bytes 8192` | 设置远端命令字节预算 |
 | `/remote config turn-max-bytes 32768` | 设置每轮远端工具总输出预算 |
-| `/remote status` | 查看当前连接和工作目录 |
-| `/remote reload` | 重新连接当前服务器 |
+| `/remote status` | 查看连接状态、完整 SSH 命令和工作目录 |
+| `/remote reload` / `/remote reconnect` | 恢复保存的工作区，支持断开后重连 |
 | `/remote disconnect` | 断开连接并返回本地 |
 | `/remote forget` | 断开连接并清除内存中的密码和密钥 passphrase |
 

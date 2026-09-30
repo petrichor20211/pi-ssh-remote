@@ -225,8 +225,8 @@ tools on the local repository.
 | `/remote config exec-max-lines 200` | Set the remote command line budget |
 | `/remote config exec-max-bytes 8192` | Set the remote command byte budget |
 | `/remote config turn-max-bytes 32768` | Set the aggregate per-turn remote output budget |
-| `/remote status` | Show the active workspace |
-| `/remote reload` | Reconnect the active workspace |
+| `/remote status` | Show connection state, full SSH command, and working directory |
+| `/remote reload` / `/remote reconnect` | Reconnect the saved workspace, including after disconnect |
 | `/remote disconnect` | Disconnect and return tools to local execution |
 | `/remote forget` | Disconnect and clear cached passwords and key passphrases |
 

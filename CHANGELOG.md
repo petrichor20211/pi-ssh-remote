@@ -19,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Fixed
 
+- Prevent `this.child.invalidate is not a function` crashes when Pi invalidates connection-result summaries, including historical results in resumed sessions, while preserving their fixed one-line display.
 - Avoid unnecessary password prompts on jump routes when a usable local default or configured private key is available.
 - Exposed the complete SSH command in agent context, connection/status/disconnect results, and connection failures instead of identifying jump-relative targets only by host and port.
 - Retained the saved SSH command and last remote directory after disconnect and session reload, allowing an explicit no-argument reconnect to rebuild the same route without automatically reconnecting a disconnected session.

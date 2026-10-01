@@ -646,7 +646,10 @@ function renderRemoteControlResult(result: any, expanded: boolean, theme: any): 
   const fallback = result.content?.find((item: any) => item.type === "text")?.text ?? "";
   const details = result.details;
   if (details?.summary) {
-    return { render: (width: number) => [truncateToWidth(details.summary, width)] };
+    return {
+      render: (width: number) => [truncateToWidth(details.summary, width)],
+      invalidate() {}, // Stateless: the summary is rendered afresh at each width.
+    };
   }
   if (details?.action !== "exec") return new Text(fallback, 0, 0);
 

@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 ### Fixed
 
 - Made remote commands honor the tool-call abort signal — both `remote`'s `exec` action and the shell tool routed to the remote — so a caller's stop request returns immediately instead of hanging until the command finishes, including while the exec channel is opening or the connection is being re-established.
+- Stopped `before_agent_start` from failing on hosts that start the agent without structured prompt options, including omp's legacy Pi shim, which reported `undefined is not an object (evaluating 'event.systemPromptOptions.sections')` on every turn. Those hosts now receive the connection, workspace, and server-memory sections as tagged blocks appended to the rendered system prompt.
 
 ## [0.1.15] - 2026-10-11
 

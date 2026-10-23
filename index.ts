@@ -13,7 +13,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   getAgentDir,
   SettingsManager,
@@ -110,6 +110,21 @@ interface SessionRemoteState {
   forwards?: string[];
 }
 
+/**
+ * `before_agent_start` payload as hosts actually deliver it.
+ *
+ * Pi exposes mutable `systemPromptOptions` and replaces the prompt string with complete
+ * overrides. Hosts that embed Pi extensions without that structure (omp routes them through a
+ * legacy Pi shim) pass only the rendered `systemPrompt` blocks and expect a replacement, so both
+ * fields are optional here.
+ */
+interface PromptSectionHost {
+  systemPrompt?: string | string[];
+  systemPromptOptions?: {
+    cwd?: string;
+    sections?: Record<string, string>;
+  };
+}
 // Use Pi's agent dir so Windows follows USERPROFILE and PI_CODING_AGENT_DIR is honored.
 const AGENT_DIR = getAgentDir();
 const KNOWN_HOSTS_FILE = join(AGENT_DIR, "ssh-remote-known-hosts.json");
@@ -499,6 +514,13 @@ function memoryManagementPrompt(remote: RemoteState): string {
 
 function remoteWorkspacePrompt(remote: RemoteState): string {
   return `SSH workspace: ${endpointDisplayLabel(remote, remote.cwd)}. The standard read, write, edit, and bash tools and user shell commands operate directly in this workspace.`;
+}
+
+/** Renders prompt sections as tagged blocks for hosts that expose only the rendered system prompt. */
+function renderPromptSections(sections: Record<string, string>): string[] {
+  return Object.entries(sections)
+    .filter(([, content]) => content)
+    .map(([name, content]) => `<${name}>\n${content}\n</${name}>`);
 }
 
 function serverMemoryContext(remote: RemoteState): string | undefined {
@@ -1890,13 +1912,33 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     }
   });
   pi.on("before_agent_start", (event) => {
-    if (remote || lastCommand) {
-      event.systemPromptOptions.sections.ssh_remote_connection = connectionDescription();
+    const host = event as unknown as PromptSectionHost;
+    const sections: Record<string, string> = {};
+    const routing = Boolean(remote) && routeRemoteTools;
+    if (remote || lastCommand) sections.ssh_remote_connection = connectionDescription();
+    if (routing && remote) {
+      sections.ssh_remote_workspace = remoteWorkspacePrompt(remote);
+      sections.ssh_remote_memory_management = memoryManagementPrompt(remote);
     }
-    if (!remote || !routeRemoteTools) return;
-    event.systemPromptOptions.cwd = remote.cwd;
-    event.systemPromptOptions.sections.ssh_remote_workspace = remoteWorkspacePrompt(remote);
-    event.systemPromptOptions.sections.ssh_remote_memory_management = memoryManagementPrompt(remote);
+    const options = host.systemPromptOptions;
+    if (options?.sections) {
+      Object.assign(options.sections, sections);
+      if (routing && remote) options.cwd = remote.cwd;
+      return undefined;
+    }
+    // Hosts that start the agent without structured prompt options (for example omp, which loads
+    // Pi extensions through a legacy Pi shim) expose only the rendered system prompt and replace it
+    // wholesale with the blocks they handed out. Append the same sections as tagged blocks.
+    const blocks = renderPromptSections(sections);
+    if (blocks.length === 0) return undefined;
+    const rendered = host.systemPrompt;
+    const systemPrompt = Array.isArray(rendered)
+      ? [...rendered, ...blocks]
+      : typeof rendered === "string"
+        ? [rendered, ...blocks].join("\n\n")
+        : undefined;
+    // The Pi handler contract declares a string prompt; those hosts accept the block array.
+    return systemPrompt === undefined ? undefined : { systemPrompt } as unknown as BeforeAgentStartEventResult;
   });
   pi.on("context", (event) => {
     if (!remote || !routeRemoteTools) return undefined;

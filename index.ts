@@ -260,7 +260,6 @@ function normalizeRemoteConfig(config: RemoteConfig): RemoteConfig {
     } catch {}
   }
   if (activeEndpoint && !endpoints[activeEndpoint]) activeEndpoint = undefined;
-  activeEndpoint ??= Object.keys(endpoints)[0];
   let displayLines: number | undefined;
   let readMaxLines: number | undefined;
   let readMaxBytes: number | undefined;

@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 ### Changed
 
 - Made `/remote forget` and `remote(action="forget")` clear the remembered SSH route along with the cached credentials, so a subsequent no-argument `/remote` no longer reconnects to a forgotten host (#13).
+- Stopped defaulting the active endpoint to the first saved entry when none is explicitly set; the active endpoint is now set only by connecting or `/remote use`. A never-connected saved endpoint no longer initialises the remembered route in unrelated sessions, and a bare `/remote` prompts for a command instead of auto-selecting the first saved endpoint (#13).
 
 ### Fixed
 - Made the `<ssh_remote_connection>` system prompt section inject only while an SSH connection is active; a remembered-but-disconnected route no longer advertises the SSH command and reconnect hint to the model, which previously caused unrelated sessions to connect to a saved host unprompted (#13).

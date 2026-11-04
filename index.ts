@@ -1359,6 +1359,8 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
           auth.forget(hop);
         }
       }
+      lastCommand = "";
+      lastCwd = undefined;
     }
     previous?.client.end();
     status(ctx);

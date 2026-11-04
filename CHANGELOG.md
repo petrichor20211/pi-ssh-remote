@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Changed
 
-- None.
+- Made `/remote forget` and `remote(action="forget")` clear the remembered SSH route along with the cached credentials, so a subsequent no-argument `/remote` no longer reconnects to a forgotten host (#13).
 
 ### Fixed
 - Made the `<ssh_remote_connection>` system prompt section inject only while an SSH connection is active; a remembered-but-disconnected route no longer advertises the SSH command and reconnect hint to the model, which previously caused unrelated sessions to connect to a saved host unprompted (#13).

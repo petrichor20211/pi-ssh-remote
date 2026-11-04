@@ -1915,7 +1915,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     const host = event as unknown as PromptSectionHost;
     const sections: Record<string, string> = {};
     const routing = Boolean(remote) && routeRemoteTools;
-    if (remote || lastCommand) sections.ssh_remote_connection = connectionDescription();
+    if (remote) sections.ssh_remote_connection = connectionDescription();
     if (routing && remote) {
       sections.ssh_remote_workspace = remoteWorkspacePrompt(remote);
       sections.ssh_remote_memory_management = memoryManagementPrompt(remote);

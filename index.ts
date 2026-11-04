@@ -1177,6 +1177,9 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       credentialCache.resume = { command: parsed.command, cwd: next.cwd, routeRemoteTools, forwards: credentialCache.resume?.forwards };
       lastCommand = parsed.command;
       lastCwd = next.cwd;
+      for (const serialized of credentialCache.resume?.forwards ?? []) {
+        await startForward(parseForwardSpec(serialized));
+      }
       saveEndpointConfig(parsed.command, { remoteCwd: next.cwd }, true);
       persistSessionRemoteState();
       oldClient?.end();
@@ -1318,7 +1321,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
   };
 
-  const restoreSessionRemoteState = async (saved: SessionRemoteState, ctx: any): Promise<void> => {
+  const restoreSessionRemoteState = (saved: SessionRemoteState, ctx: any): void => {
     lastCommand = saved.command ?? "";
     lastCwd = saved.cwd;
     if (!saved.connected) {
@@ -1327,12 +1330,14 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       return;
     }
     const command = saved.command!;
-    const next = await connectInteractive(command, ctx, saved.cwd);
-    if (!next) throw new Error(lastConnectionError || "SSH remote session restore was cancelled or failed");
-    routeRemoteTools = saved.routeRemoteTools ?? true;
-    const specs = (saved.forwards ?? []).map(parseForwardSpec);
-    for (const spec of specs) await startForward(spec);
-    credentialCache.resume = { command, cwd: next.cwd, routeRemoteTools, forwards: [...forwardSpecs.values()].map(serializeForward) };
+    const cwd = saved.cwd ?? configuredCwd(command);
+    credentialCache.resume = {
+      command,
+      cwd,
+      routeRemoteTools: saved.routeRemoteTools ?? true,
+      forwards: saved.forwards ?? [],
+    };
+    ctx.ui.notify(`SSH remote route remembered: ${command}; run /remote or remote(action="reconnect") to reconnect`, "info");
     status(ctx);
   };
 
@@ -1525,6 +1530,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       }
       if (params.action === "unforward") {
         await stopForwards();
+        if (credentialCache.resume) credentialCache.resume = { ...credentialCache.resume, forwards: [] };
         persistSessionRemoteState();
         return { content: [{ type: "text", text: "Closed all extension-managed SSH port forwards." }], details: { forwardedPorts: [] } };
       }
@@ -1776,6 +1782,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       }
       if (action === "unforward") {
         await stopForwards();
+        if (credentialCache.resume) credentialCache.resume = { ...credentialCache.resume, forwards: [] };
         persistSessionRemoteState();
         ctx.ui.notify("Closed all extension-managed SSH remote port forwards", "info");
         return;
@@ -1881,7 +1888,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     } finally {
       restoringSessionState = false;
     }
-    if (inherited && remote) persistSessionRemoteState();
+    if (inherited) persistSessionRemoteState();
   });
   pi.on("session_shutdown", async (event) => {
     sessionReady = false;

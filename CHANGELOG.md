@@ -14,9 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 - Made `/remote forget` and `remote(action="forget")` clear the remembered SSH route along with the cached credentials, so a subsequent no-argument `/remote` no longer reconnects to a forgotten host (#13).
 - Stopped defaulting the active endpoint to the first saved entry when none is explicitly set; the active endpoint is now set only by connecting or `/remote use`. A never-connected saved endpoint no longer initialises the remembered route in unrelated sessions, and a bare `/remote` prompts for a command instead of auto-selecting the first saved endpoint (#13).
+- Resuming a session (including reload/new/fork inheritance within the same process) no longer silently reconnects to a saved `connected` route; the route is remembered with a notification, and reconnecting now requires an explicit `/remote` or `remote(action="reconnect")` (#13).
 
 ### Fixed
 - Made the `<ssh_remote_connection>` system prompt section inject only while an SSH connection is active; a remembered-but-disconnected route no longer advertises the SSH command and reconnect hint to the model, which previously caused unrelated sessions to connect to a saved host unprompted (#13).
+- Re-establishing a route now restarts the port forwards recorded for it instead of silently dropping them, and forwards closed with `unforward` are no longer restarted afterwards.
 
 - Made remote commands honor the tool-call abort signal — both `remote`'s `exec` action and the shell tool routed to the remote — so a caller's stop request returns immediately instead of hanging until the command finishes, including while the exec channel is opening or the connection is being re-established.
 - Stopped `before_agent_start` from failing on hosts that start the agent without structured prompt options, including omp's legacy Pi shim, which reported `undefined is not an object (evaluating 'event.systemPromptOptions.sections')` on every turn. Those hosts now receive the connection, workspace, and server-memory sections as tagged blocks appended to the rendered system prompt.

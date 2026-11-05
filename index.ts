@@ -979,6 +979,16 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     return posix.join(remote.cwd, normalized);
   };
 
+  // Built-in tools resolve paths against ctx.cwd, but mapPath only translates paths under localCwd.
+  // Object.create keeps Pi's lazy context getters and non-enumerable members that a spread would drop.
+  const remoteToolContext = <T extends { cwd: string }>(ctx: T): T =>
+    ctx && Object.create(ctx, { cwd: { value: localCwd, enumerable: true } });
+
+  // AgentTool types execute with four parameters, but Pi's wrapper forwards a fifth context argument to the
+  // tool definition, which reads the PI_* session variables, model, and cwd from it.
+  type WithContext<T> = T & { execute(id: string, params: any, signal: AbortSignal | undefined, update: any, ctx: any): Promise<any> };
+  const withContext = <T extends object>(tool: T): WithContext<T> => tool as WithContext<T>;
+
   const serializeForward = (spec: ForwardSpec): string => `${spec.localPort}:${spec.remoteHost}:${spec.remotePort}`;
 
   const currentSessionRemoteState = (): SessionRemoteState => remote ? {
@@ -1386,14 +1396,14 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     },
   });
 
-  const executeRemoteRead = async (id: string, params: any, signal: AbortSignal | undefined, update: any) => {
+  const executeRemoteRead = async (id: string, params: any, signal: AbortSignal | undefined, update: any, ctx: any) => {
     if (signal?.aborted) throw new Error("aborted");
     const path = remotePath(params.path);
     await withReconnect((client) => withSftp(client, (sftp) =>
       new Promise<void>((resolve, reject) => sftp.stat(path, (error) => error ? reject(error) : resolve()))));
     const mime = await detectRemoteMimeType(path);
     if (mime && ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mime)) {
-      const result = await createReadTool(localCwd, { operations: remoteReadOps() }).execute(id, params, signal, update);
+      const result = await withContext(createReadTool(localCwd, { operations: remoteReadOps() })).execute(id, params, signal, update, remoteToolContext(ctx));
       return limitRemoteToolResult(result, "read", params.offset ?? 1);
     }
     if (mime && !isTextMimeType(mime)) throw new Error(`Refusing to read remote binary file as text (${mime}): ${params.path}`);
@@ -1439,10 +1449,10 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     },
   });
 
-  const localRead = createReadTool(localCwd);
-  const localWrite = createWriteTool(localCwd);
-  const localEdit = createEditTool(localCwd);
-  let localBash = createBashTool(localCwd);
+  const localRead = withContext(createReadTool(localCwd));
+  const localWrite = withContext(createWriteTool(localCwd));
+  const localEdit = withContext(createEditTool(localCwd));
+  let localBash = withContext(createBashTool(localCwd));
   const targetsLocalServerMemory = (path: unknown): boolean => {
     if (!remote || typeof path !== "string") return false;
     return resolve(path.replace(/^@/, "")) === serverMemoryFilePath(remote);
@@ -1451,31 +1461,31 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     ...localRead,
     description: `Read file contents. Remote text reads fetch only the requested range and return at most ${DEFAULT_READ_MAX_LINES} lines or ${formatSize(DEFAULT_READ_MAX_BYTES)} by default; use offset/limit to continue. ${REMOTE_FILE_TOOL_ROUTING_DESCRIPTION}`,
     promptGuidelines: ["Use read with offset/limit for remote code and logs; inspect large files in focused chunks instead of reading them wholesale."],
-    execute: (id, params, signal, update) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
-      ? executeRemoteRead(id, params, signal, update)
-      : localRead.execute(id, params, signal, update),
+    execute: (id, params, signal, update, ctx) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
+      ? executeRemoteRead(id, params, signal, update, ctx)
+      : localRead.execute(id, params, signal, update, ctx),
   });
   pi.registerTool({
     ...localWrite,
     description: `${localWrite.description} ${REMOTE_FILE_TOOL_ROUTING_DESCRIPTION}`,
-    execute: (id, params, signal, update) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
-      ? createWriteTool(localCwd, { operations: remoteWriteOps() }).execute(id, params, signal, update)
-      : localWrite.execute(id, params, signal, update),
+    execute: (id, params, signal, update, ctx) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
+      ? withContext(createWriteTool(localCwd, { operations: remoteWriteOps() })).execute(id, params, signal, update, remoteToolContext(ctx))
+      : localWrite.execute(id, params, signal, update, ctx),
   });
   pi.registerTool({
     ...localEdit,
     description: `${localEdit.description} ${REMOTE_FILE_TOOL_ROUTING_DESCRIPTION}`,
-    execute: (id, params, signal, update) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
-      ? createEditTool(localCwd, { operations: remoteEditOps() }).execute(id, params, signal, update)
-      : localEdit.execute(id, params, signal, update),
+    execute: (id, params, signal, update, ctx) => remote && routeRemoteTools && !targetsLocalServerMemory(params.path)
+      ? withContext(createEditTool(localCwd, { operations: remoteEditOps() })).execute(id, params, signal, update, remoteToolContext(ctx))
+      : localEdit.execute(id, params, signal, update, ctx),
   });
   pi.registerTool({
     ...localBash,
     description: `Execute a shell command. Remote model-facing output returns at most the last ${DEFAULT_EXEC_MAX_LINES} lines or ${formatSize(DEFAULT_EXEC_MAX_BYTES)} by default; complete oversized output is saved locally. ${REMOTE_SHELL_TOOL_ROUTING_DESCRIPTION}`,
     promptGuidelines: ["When using bash for remote logs and broad searches, use bounded commands such as tail, sed, or rg with limits instead of cat or unbounded find output."],
-    execute: async (id, params, signal, update) => {
-      if (!remote || !routeRemoteTools) return localBash.execute(id, params, signal, update);
-      const result = await createBashTool(localCwd, { operations: remoteBashOps() }).execute(id, params, signal, update);
+    execute: async (id, params, signal, update, ctx) => {
+      if (!remote || !routeRemoteTools) return localBash.execute(id, params, signal, update, ctx);
+      const result = await withContext(createBashTool(localCwd, { operations: remoteBashOps() })).execute(id, params, signal, update, remoteToolContext(ctx));
       return limitRemoteToolResult(result, "exec");
     },
   });
@@ -1849,10 +1859,10 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     const settings = SettingsManager.create(ctx.cwd, getAgentDir(), {
       projectTrusted: ctx.isProjectTrusted(),
     });
-    localBash = createBashTool(ctx.cwd, {
+    localBash = withContext(createBashTool(ctx.cwd, {
       shellPath: settings.getShellPath(),
       commandPrefix: settings.getShellCommandPrefix(),
-    });
+    }));
     currentCtx = ctx;
     sessionReady = true;
     ctx.ui.addAutocompleteProvider(suppressRemoteCompletionsBeforeSuffix);

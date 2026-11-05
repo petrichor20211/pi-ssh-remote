@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 - Made remote commands honor the tool-call abort signal — both `remote`'s `exec` action and the shell tool routed to the remote — so a caller's stop request returns immediately instead of hanging until the command finishes, including while the exec channel is opening or the connection is being re-established.
 - Stopped `before_agent_start` from failing on hosts that start the agent without structured prompt options, including omp's legacy Pi shim, which reported `undefined is not an object (evaluating 'event.systemPromptOptions.sections')` on every turn. Those hosts now receive the connection, workspace, and server-memory sections as tagged blocks appended to the rendered system prompt.
+- Forwarded Pi's tool-call context through the `bash`, `read`, `write`, and `edit` overrides (#12). Local commands again receive `PI_SESSION_ID`, `PI_SESSION_FILE`, `PI_PROVIDER`, `PI_MODEL`, and `PI_REASONING_LEVEL` as with Pi's built-in tools, local file tools resolve relative paths against the session directory, and remote image reads honor the current model's image limits. Remote routes still map paths from the local workspace, and remote commands do not receive these variables.
 
 ## [0.1.15] - 2026-10-11
 

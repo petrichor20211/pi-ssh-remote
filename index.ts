@@ -938,11 +938,13 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     endpointConfig(loadRemoteConfig(), command).forwards ?? [];
 
   const connectionDescription = (): string => {
-    const command = remote?.command || lastCommand;
     const state = `SSH remote: ${remote ? "connected" : "disconnected"}; tool routing: ${routeRemoteTools ? "remote" : "local"}.`;
-    if (!command) return state;
-    const cwd = remote?.cwd ?? lastCwd ?? configuredCwd(command);
-    return `${state}\nSSH command: ${command}\nRemote cwd: ${cwd}\nResume: remote(action="reconnect")`;
+    if (!remote) {
+      return credentialCache.resume
+        ? `${state}\nA route is remembered from an earlier session; reconnecting requires an explicit user request.`
+        : state;
+    }
+    return `${state}\nSSH command: ${remote.command}\nRemote cwd: ${remote.cwd}\nResume: remote(action="reconnect")`;
   };
 
   const connectionResult = (summary: string, extra: Record<string, unknown> = {}) => ({
@@ -1170,16 +1172,15 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     }
     const parsed = parseSshCommand(source.command);
     reconnectPromise = (async () => {
+      const savedForwards = credentialCache.resume?.forwards ?? [];
       const oldClient = remote?.client;
       const next = await establish(parsed, source.cwd);
       remote = next;
       routeRemoteTools = resumeRouting;
-      credentialCache.resume = { command: parsed.command, cwd: next.cwd, routeRemoteTools, forwards: credentialCache.resume?.forwards };
       lastCommand = parsed.command;
       lastCwd = next.cwd;
-      for (const serialized of credentialCache.resume?.forwards ?? []) {
-        await startForward(parseForwardSpec(serialized));
-      }
+      const restartedForwards = await restartForwards(savedForwards);
+      credentialCache.resume = { command: parsed.command, cwd: next.cwd, routeRemoteTools, forwards: restartedForwards };
       saveEndpointConfig(parsed.command, { remoteCwd: next.cwd }, true);
       persistSessionRemoteState();
       oldClient?.end();
@@ -1321,7 +1322,27 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
   };
 
-  const restoreSessionRemoteState = (saved: SessionRemoteState, ctx: any): void => {
+  // Restarts recorded forwards one by one: a local port that is already taken must not abort the
+  // rest of the route, and the caller records only the forwards that actually came up.
+  const restartForwards = async (serializedSpecs: string[], ctx = currentCtx): Promise<string[]> => {
+    const running: string[] = [];
+    const failures: string[] = [];
+    for (const serialized of serializedSpecs) {
+      try {
+        const spec = parseForwardSpec(serialized);
+        await startForward(spec);
+        if (forwardServers.has(spec.localPort)) running.push(serialized);
+      } catch (error) {
+        failures.push(`${serialized} (${(error as Error).message})`);
+      }
+    }
+    if (failures.length && ctx) {
+      ctx.ui.notify(`SSH remote forward(s) not restarted: ${failures.join("; ")}`, "warning");
+    }
+    return running;
+  };
+
+  const restoreSessionRemoteState = async (saved: SessionRemoteState, ctx: any): Promise<void> => {
     lastCommand = saved.command ?? "";
     lastCwd = saved.cwd;
     if (!saved.connected) {
@@ -1330,14 +1351,11 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       return;
     }
     const command = saved.command!;
-    const cwd = saved.cwd ?? configuredCwd(command);
-    credentialCache.resume = {
-      command,
-      cwd,
-      routeRemoteTools: saved.routeRemoteTools ?? true,
-      forwards: saved.forwards ?? [],
-    };
-    ctx.ui.notify(`SSH remote route remembered: ${command}; run /remote or remote(action="reconnect") to reconnect`, "info");
+    const next = await connectInteractive(command, ctx, saved.cwd);
+    if (!next) throw new Error(lastConnectionError || "SSH remote session restore was cancelled or failed");
+    routeRemoteTools = saved.routeRemoteTools ?? true;
+    const restarted = await restartForwards(saved.forwards ?? [], ctx);
+    credentialCache.resume = { command, cwd: next.cwd, routeRemoteTools, forwards: restarted };
     status(ctx);
   };
 
@@ -1820,7 +1838,12 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       if (["disconnect", "off", "exit"].includes(action)) { disconnect(ctx); return; }
       if (action === "forget") { disconnect(ctx, true); return; }
       if (action === "status") {
-        ctx.ui.notify(connectionDescription(), "info");
+        // The prompt section stays command-free while disconnected; the user's own status view may
+        // still name the remembered route.
+        const remembered = !remote && credentialCache.resume
+          ? `\nRemembered route: ${credentialCache.resume.command}\nRemote cwd: ${credentialCache.resume.cwd}\nReconnect: /remote or remote(action="reconnect")`
+          : "";
+        ctx.ui.notify(`${connectionDescription()}${remembered}`, "info");
         return;
       }
       if (["reload", "reconnect"].includes(action)) {
@@ -1923,7 +1946,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     const host = event as unknown as PromptSectionHost;
     const sections: Record<string, string> = {};
     const routing = Boolean(remote) && routeRemoteTools;
-    if (remote) sections.ssh_remote_connection = connectionDescription();
+    if (remote || credentialCache.resume) sections.ssh_remote_connection = connectionDescription();
     if (routing && remote) {
       sections.ssh_remote_workspace = remoteWorkspacePrompt(remote);
       sections.ssh_remote_memory_management = memoryManagementPrompt(remote);

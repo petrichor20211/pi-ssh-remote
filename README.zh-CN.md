@@ -357,3 +357,23 @@ Host work
 完整的新增内容、行为变更和 Bug 修复记录请查看 [CHANGELOG.md](CHANGELOG.md)。
 
 MIT License。
+
+## 贡献者
+
+感谢每一位为 pi-ssh-remote 贡献代码的朋友。
+
+<p>
+  <a href="https://github.com/theLittleStone" title="theLittleStone"><img src="https://github.com/theLittleStone.png?size=64" width="64" height="64" alt="theLittleStone"></a>
+  <a href="https://github.com/civcode" title="civcode"><img src="https://github.com/civcode.png?size=64" width="64" height="64" alt="civcode"></a>
+  <a href="https://github.com/aeiou10086" title="aeiou10086"><img src="https://github.com/aeiou10086.png?size=64" width="64" height="64" alt="aeiou10086"></a>
+  <a href="https://github.com/nagaame" title="nagaame"><img src="https://github.com/nagaame.png?size=64" width="64" height="64" alt="nagaame"></a>
+  <a href="https://github.com/SwenChan" title="SwenChan"><img src="https://github.com/SwenChan.png?size=64" width="64" height="64" alt="SwenChan"></a>
+</p>
+
+- [@theLittleStone](https://github.com/theLittleStone) 将插件数据改存到 Pi 的 agent 目录，不再写入工作目录（[#3](https://github.com/petrichor20211/pi-ssh-remote/pull/3)）。
+- [@civcode](https://github.com/civcode) 为 `/remote` 参数添加了斜杠命令自动补全（[#7](https://github.com/petrichor20211/pi-ssh-remote/pull/7)）。
+- [@aeiou10086](https://github.com/aeiou10086) 让远程命令响应工具调用的中止信号（[#10](https://github.com/petrichor20211/pi-ssh-remote/pull/10)）。
+- [@nagaame](https://github.com/nagaame) 支持了启动 agent 时不带结构化提示词选项的宿主（[#11](https://github.com/petrichor20211/pi-ssh-remote/pull/11)）。
+- [@SwenChan](https://github.com/SwenChan) 修复了断开状态下已保存 SSH 路由泄漏到系统提示词的问题（[#14](https://github.com/petrichor20211/pi-ssh-remote/pull/14)）。
+
+欢迎参与贡献：在 [GitHub](https://github.com/petrichor20211/pi-ssh-remote) 上提交 issue 或 pull request。

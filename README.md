@@ -283,3 +283,23 @@ Latest release: [v0.1.15](https://github.com/petrichor20211/pi-ssh-remote/releas
 See [CHANGELOG.md](CHANGELOG.md) for the complete release history, including additions, behavior changes, and bug fixes.
 
 MIT licensed.
+
+## Contributors
+
+Thank you to everyone who has contributed code to pi-ssh-remote.
+
+<p>
+  <a href="https://github.com/theLittleStone" title="theLittleStone"><img src="https://github.com/theLittleStone.png?size=64" width="64" height="64" alt="theLittleStone"></a>
+  <a href="https://github.com/civcode" title="civcode"><img src="https://github.com/civcode.png?size=64" width="64" height="64" alt="civcode"></a>
+  <a href="https://github.com/aeiou10086" title="aeiou10086"><img src="https://github.com/aeiou10086.png?size=64" width="64" height="64" alt="aeiou10086"></a>
+  <a href="https://github.com/nagaame" title="nagaame"><img src="https://github.com/nagaame.png?size=64" width="64" height="64" alt="nagaame"></a>
+  <a href="https://github.com/SwenChan" title="SwenChan"><img src="https://github.com/SwenChan.png?size=64" width="64" height="64" alt="SwenChan"></a>
+</p>
+
+- [@theLittleStone](https://github.com/theLittleStone) kept plugin data in Pi's agent directory instead of the working directory ([#3](https://github.com/petrichor20211/pi-ssh-remote/pull/3)).
+- [@civcode](https://github.com/civcode) added slash-command autocomplete for `/remote` arguments ([#7](https://github.com/petrichor20211/pi-ssh-remote/pull/7)).
+- [@aeiou10086](https://github.com/aeiou10086) made remote commands honor the tool-call abort signal ([#10](https://github.com/petrichor20211/pi-ssh-remote/pull/10)).
+- [@nagaame](https://github.com/nagaame) supported hosts that start the agent without structured prompt options ([#11](https://github.com/petrichor20211/pi-ssh-remote/pull/11)).
+- [@SwenChan](https://github.com/SwenChan) stopped the saved SSH route from leaking into the system prompt while disconnected ([#14](https://github.com/petrichor20211/pi-ssh-remote/pull/14)).
+
+Contributions are welcome: open an issue or a pull request on [GitHub](https://github.com/petrichor20211/pi-ssh-remote).

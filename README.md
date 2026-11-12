@@ -271,14 +271,14 @@ This is a supported subset, not full OpenSSH compatibility: system SSH config is
 
 ## Releases
 
-Latest release: [v0.1.15](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.15)
+Latest release: [v0.1.16](https://github.com/petrichor20211/pi-ssh-remote/releases/tag/v0.1.16)
 
 | Version | Date | Highlights |
 |---|---|---|
+| [0.1.16](CHANGELOG.md#0116---2026-11-12) | 2026-11-12 | Disconnected sessions no longer advertise the saved SSH route, remote commands honor abort signals, and hosts without structured prompt options are supported |
 | [0.1.15](CHANGELOG.md#0115---2026-10-11) | 2026-10-11 | Per-host SSH config and default-key discovery, route-preserving reconnects, and UI/autocomplete fixes |
 | [0.1.14](CHANGELOG.md#0114---2026-09-28) | 2026-09-28 | ProxyJump connections, `/remote` argument completion, and clearer SSH tool routing |
 | [0.1.13](CHANGELOG.md#0113---2026-09-18) | 2026-09-18 | Graceful working-directory fallback, longer SSH handshakes, and Windows path fixes |
-| [0.1.12](CHANGELOG.md#0112---2026-08-25) | 2026-08-25 | Safe handling of repeated SSH errors when a connection is lost during handshake |
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete release history, including additions, behavior changes, and bug fixes.
 

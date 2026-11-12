@@ -12,6 +12,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 ### Changed
 
+- None.
+
+### Fixed
+
+- None.
+
+## [0.1.16] - 2026-11-12
+
+### Added
+
+- None.
+
+### Changed
+
 - Made `/remote forget` and `remote(action="forget")` clear the remembered SSH route along with the cached credentials, so a subsequent no-argument `/remote` in the same session no longer reconnects to a forgotten host; the saved endpoint itself stays in the configuration and can be selected again with `/remote use` (#13).
 - Stopped defaulting the active endpoint to the first saved entry when none is explicitly set; the active endpoint is now set only by connecting or `/remote use`. A never-connected saved endpoint no longer initialises the remembered route in unrelated sessions, and a bare `/remote` prompts for a command instead of auto-selecting the first saved endpoint (#13).
 
@@ -283,7 +297,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 
 - None.
 
-[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.15...HEAD
+[Unreleased]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.16...HEAD
+[0.1.16]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/petrichor20211/pi-ssh-remote/compare/v0.1.12...v0.1.13

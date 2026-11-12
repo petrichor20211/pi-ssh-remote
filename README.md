@@ -296,10 +296,4 @@ Thank you to everyone who has contributed code to pi-ssh-remote.
   <a href="https://github.com/SwenChan" title="SwenChan"><img src="https://github.com/SwenChan.png?size=64" width="64" height="64" alt="SwenChan"></a>
 </p>
 
-- [@theLittleStone](https://github.com/theLittleStone) kept plugin data in Pi's agent directory instead of the working directory ([#3](https://github.com/petrichor20211/pi-ssh-remote/pull/3)).
-- [@civcode](https://github.com/civcode) added slash-command autocomplete for `/remote` arguments ([#7](https://github.com/petrichor20211/pi-ssh-remote/pull/7)).
-- [@aeiou10086](https://github.com/aeiou10086) made remote commands honor the tool-call abort signal ([#10](https://github.com/petrichor20211/pi-ssh-remote/pull/10)).
-- [@nagaame](https://github.com/nagaame) supported hosts that start the agent without structured prompt options ([#11](https://github.com/petrichor20211/pi-ssh-remote/pull/11)).
-- [@SwenChan](https://github.com/SwenChan) stopped the saved SSH route from leaking into the system prompt while disconnected ([#14](https://github.com/petrichor20211/pi-ssh-remote/pull/14)).
-
 Contributions are welcome: open an issue or a pull request on [GitHub](https://github.com/petrichor20211/pi-ssh-remote).

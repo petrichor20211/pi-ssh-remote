@@ -286,14 +286,10 @@ MIT licensed.
 
 ## Contributors
 
-Thank you to everyone who has contributed code to pi-ssh-remote.
+Thank you to all the people who have contributed to pi-ssh-remote!
 
-<p>
-  <a href="https://github.com/theLittleStone" title="theLittleStone"><img src="https://github.com/theLittleStone.png?size=64" width="64" height="64" alt="theLittleStone"></a>
-  <a href="https://github.com/civcode" title="civcode"><img src="https://github.com/civcode.png?size=64" width="64" height="64" alt="civcode"></a>
-  <a href="https://github.com/aeiou10086" title="aeiou10086"><img src="https://github.com/aeiou10086.png?size=64" width="64" height="64" alt="aeiou10086"></a>
-  <a href="https://github.com/nagaame" title="nagaame"><img src="https://github.com/nagaame.png?size=64" width="64" height="64" alt="nagaame"></a>
-  <a href="https://github.com/SwenChan" title="SwenChan"><img src="https://github.com/SwenChan.png?size=64" width="64" height="64" alt="SwenChan"></a>
-</p>
+<a href="https://github.com/petrichor20211/pi-ssh-remote/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=petrichor20211/pi-ssh-remote" alt="Contributors" />
+</a>
 
 Contributions are welcome: open an issue or a pull request on [GitHub](https://github.com/petrichor20211/pi-ssh-remote).

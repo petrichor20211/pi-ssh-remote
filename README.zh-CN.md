@@ -360,14 +360,10 @@ MIT License。
 
 ## 贡献者
 
-感谢每一位为 pi-ssh-remote 贡献代码的朋友。
+感谢所有为 pi-ssh-remote 做出贡献的朋友！
 
-<p>
-  <a href="https://github.com/theLittleStone" title="theLittleStone"><img src="https://github.com/theLittleStone.png?size=64" width="64" height="64" alt="theLittleStone"></a>
-  <a href="https://github.com/civcode" title="civcode"><img src="https://github.com/civcode.png?size=64" width="64" height="64" alt="civcode"></a>
-  <a href="https://github.com/aeiou10086" title="aeiou10086"><img src="https://github.com/aeiou10086.png?size=64" width="64" height="64" alt="aeiou10086"></a>
-  <a href="https://github.com/nagaame" title="nagaame"><img src="https://github.com/nagaame.png?size=64" width="64" height="64" alt="nagaame"></a>
-  <a href="https://github.com/SwenChan" title="SwenChan"><img src="https://github.com/SwenChan.png?size=64" width="64" height="64" alt="SwenChan"></a>
-</p>
+<a href="https://github.com/petrichor20211/pi-ssh-remote/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=petrichor20211/pi-ssh-remote" alt="Contributors" />
+</a>
 
 欢迎参与贡献：在 [GitHub](https://github.com/petrichor20211/pi-ssh-remote) 上提交 issue 或 pull request。

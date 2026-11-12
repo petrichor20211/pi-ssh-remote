@@ -939,11 +939,9 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
 
   const connectionDescription = (): string => {
     const state = `SSH remote: ${remote ? "connected" : "disconnected"}; tool routing: ${routeRemoteTools ? "remote" : "local"}.`;
-    if (!remote) {
-      return credentialCache.resume
-        ? `${state}\nA route is remembered from an earlier session; reconnecting requires an explicit user request.`
-        : state;
-    }
+    // While disconnected the prompt carries only this non-actionable status line: the remembered route
+    // belongs to the user's /remote command, not to the model (#13).
+    if (!remote) return state;
     return `${state}\nSSH command: ${remote.command}\nRemote cwd: ${remote.cwd}\nResume: remote(action="reconnect")`;
   };
 
@@ -1848,10 +1846,10 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       if (["disconnect", "off", "exit"].includes(action)) { disconnect(ctx); return; }
       if (action === "forget") { disconnect(ctx, true); return; }
       if (action === "status") {
-        // The prompt section stays command-free while disconnected; the user's own status view may
-        // still name the remembered route.
-        const remembered = !remote && credentialCache.resume
-          ? `\nRemembered route: ${credentialCache.resume.command}\nRemote cwd: ${credentialCache.resume.cwd}\nReconnect: /remote or remote(action="reconnect")`
+        // The prompt section stays command-free while disconnected; the user's own status view still
+        // names the route that a bare /remote would reconnect to.
+        const remembered = !remote && lastCommand
+          ? `\nRemembered route: ${lastCommand}\nRemote cwd: ${lastCwd ?? configuredCwd(lastCommand)}\nReconnect: /remote or remote(action="reconnect")`
           : "";
         ctx.ui.notify(`${connectionDescription()}${remembered}`, "info");
         return;
@@ -1956,7 +1954,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     const host = event as unknown as PromptSectionHost;
     const sections: Record<string, string> = {};
     const routing = Boolean(remote) && routeRemoteTools;
-    if (remote || credentialCache.resume) sections.ssh_remote_connection = connectionDescription();
+    if (remote || lastCommand) sections.ssh_remote_connection = connectionDescription();
     if (routing && remote) {
       sections.ssh_remote_workspace = remoteWorkspacePrompt(remote);
       sections.ssh_remote_memory_management = memoryManagementPrompt(remote);
